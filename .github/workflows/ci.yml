@@ -8,6 +8,13 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +27,31 @@ jobs:
       - run: npm run test
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
+      - name: Build contracts
+        run: npm run build --workspace @f-commerce/contracts
+      - name: Start backend
+        env:
+          NODE_ENV: test
+          PORT: 4000
+          MONGODB_URI: mongodb://127.0.0.1:27017/f-commerce-e2e
+          CORS_ORIGINS: http://localhost:3000
+        run: npm run dev --workspace @f-commerce/backend > backend.log 2>&1 &
+      - name: Wait for backend and database
+        run: |
+          for i in $(seq 1 60); do
+            if grep -q "Database connected successfully" backend.log 2>/dev/null; then
+              curl --fail --silent http://127.0.0.1:4000/health > /dev/null && exit 0
+            fi
+            if grep -q "Failed to connect to database" backend.log 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          cat backend.log
+          exit 1
       - name: Run Playwright tests
         run: cd frontend && npx playwright test
+      - name: Show backend log
+        if: always()
+        run: cat backend.log || true
       - run: npm run build
