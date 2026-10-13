@@ -30,15 +30,22 @@ export const BusinessProfileUpdateSchema = z.object({
   address: AddressSchema.optional(),
 });
 
+const DraftAddressSchema = z.object({
+  street: z.string(),
+  city: z.string(),
+  region: z.string().optional(),
+  postalCode: z.string().optional(),
+  country: z.string(),
+});
+
 /**
- * Draft save. The value is validated per field so an invalid currency or
- * malformed address is rejected at the boundary instead of being stored
- * verbatim in the draft.
+ * Draft save. Drafts hold partial wizard progress, so the address may be
+ * incomplete; completion still requires the full AddressSchema.
  */
 export const DraftSaveSchema = z.discriminatedUnion('field', [
   z.object({ field: z.literal('name'), value: z.string().min(1) }),
   z.object({ field: z.literal('currency'), value: CurrencyEnum }),
-  z.object({ field: z.literal('address'), value: AddressSchema }),
+  z.object({ field: z.literal('address'), value: DraftAddressSchema }),
   z.object({ field: z.literal('logoUrl'), value: z.string().url().or(z.literal('')) }),
 ]);
 

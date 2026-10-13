@@ -114,9 +114,11 @@ export default function OnboardingPage() {
     })
       .then(async (res) => {
         if (res.status === 403 && res.headers.get('content-type')?.includes('json')) {
-          return res.json().then((data) => {
+          return res.json().then(async (data) => {
             if (data.error?.includes('Onboarding') || data.message?.includes('Onboarding')) {
-              return null;
+              const onboardingRes = await apiFetch('/api/business/onboarding', { method: 'GET' });
+              if (!onboardingRes.ok) throw new Error('Failed to load onboarding');
+              return onboardingRes.json();
             }
             throw new Error('Access denied');
           });
@@ -160,34 +162,6 @@ export default function OnboardingPage() {
           } else {
             // No draft yet — just pre-fill the name from DB
             setForm((prev) => ({ ...prev, name: businessName }));
-          }
-        } else if (!cancelled && !data) {
-          // 403 Onboarding required — fetch business name from auth profile
-          // to pre-fill step 1 (it was provided at registration)
-          const authRes = await apiFetch('/api/auth/me', { method: 'GET' });
-          if (authRes.ok) {
-            const authData: {
-              businesses?: Array<{
-                businessId: string | { _id: string; name?: string };
-                name?: string;
-              }>;
-            } = await authRes.json();
-            const businessId = window.localStorage.getItem('businessId') ?? '';
-            const membership =
-              authData.businesses?.find((business) => {
-                const id =
-                  typeof business.businessId === 'string'
-                    ? business.businessId
-                    : business.businessId._id;
-                return id === businessId;
-              }) ?? authData.businesses?.[0];
-            const name =
-              typeof membership?.businessId === 'object'
-                ? membership.businessId.name
-                : membership?.name;
-            if (name) {
-              setForm((prev) => ({ ...prev, name }));
-            }
           }
         }
       })

@@ -40,7 +40,11 @@ vi.mock('../middlewares/auth.middleware.js', () => ({
   requireAuth: vi.fn((_req, _res, next) => next()),
   requireBusinessRole: vi.fn(
     () =>
-      (_req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) =>
+      (
+        _req: import('express').Request,
+        _res: import('express').Response,
+        next: import('express').NextFunction,
+      ) =>
         next(),
   ),
 }));
@@ -80,9 +84,7 @@ describe('Business Controller - Onboarding Gate', () => {
 
   // covers AC-4: non-member cannot probe a business they have no relationship with
   it('rejects a non-member with 403 and does not probe the DB for a business they cannot access', async () => {
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-stranger');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-stranger');
 
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('Insufficient permissions');
@@ -98,9 +100,7 @@ describe('Business Controller - Onboarding Gate', () => {
       onboardingComplete: false,
     });
 
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('Onboarding required');
@@ -113,9 +113,7 @@ describe('Business Controller - Onboarding Gate', () => {
   it('returns 500 when the DB lookup fails inside the gate', async () => {
     getBusinessMock.mockRejectedValueOnce(new Error('DB connection lost'));
 
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Internal server error');
@@ -204,9 +202,7 @@ describe('Business Controller - GET /me', () => {
     // Called twice: once by the onboarding gate, once by the route handler
     getBusinessMock.mockResolvedValue(mockBusiness);
 
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -236,9 +232,7 @@ describe('Business Controller - GET /me', () => {
     // Called twice: once by the onboarding gate, once by the route handler
     getBusinessMock.mockResolvedValue(noLogoBiz);
 
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(200);
     expect(res.body.data.logoUrl).toBeNull();
@@ -261,9 +255,7 @@ describe('Business Controller - GET /me', () => {
       onboardingDraft: draft,
     });
 
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     // The gate will block for incomplete business on /me, returning 403.
     // This is correct behavior — the frontend uses /auth/me for pre-fill instead.
@@ -281,9 +273,7 @@ describe('Business Controller - GET /me', () => {
     // the gate check but is deleted between gate and handler (race condition).
     // This is an edge case that's hard to test without more granular mocking.
     // For now, verify the gate behavior:
-    const res = await request(app)
-      .get('/api/business/me')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).get('/api/business/me').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('Onboarding required');
@@ -627,14 +617,33 @@ describe('Business Controller - PUT /onboarding/draft', () => {
     expect(saveDraftMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when address value is missing required fields', async () => {
+  it('returns 400 when address value is missing a required key', async () => {
     const res = await request(app)
       .put('/api/business/onboarding/draft')
       .set('x-business-id', 'biz-target')
-      .send({ field: 'address', value: { street: '', city: '', country: '' } });
+      .send({ field: 'address', value: { street: '123 Main', country: 'Bangladesh' } });
 
     expect(res.status).toBe(400);
     expect(saveDraftMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts an incomplete address draft with empty strings', async () => {
+    saveDraftMock.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({
+        field: 'address',
+        value: { street: '50 Draft Lane', city: '', country: 'Bangladesh' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'address', {
+      street: '50 Draft Lane',
+      city: '',
+      country: 'Bangladesh',
+    });
   });
 
   it('returns 400 when logoUrl value is not a valid URL', async () => {
@@ -709,9 +718,7 @@ describe('Business Controller - POST /logo', () => {
 
   // covers AC-3: rejects when no file is attached
   it('returns 400 when no file is uploaded', async () => {
-    const res = await request(app)
-      .post('/api/business/logo')
-      .set('x-business-id', 'biz-target');
+    const res = await request(app).post('/api/business/logo').set('x-business-id', 'biz-target');
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('No file uploaded');

@@ -23,11 +23,11 @@ _Steps derived from spec 0004 acceptance criteria. `/check verify` runs these; `
 
 **UI wizard steps still need manual browser verification** (the wizard is a client-side 4-step flow that can't be fully exercised via curl alone, but all API endpoints it calls are verified working through the proxy with auth headers):
 
-- [x] Fill wizard step 1 (business name) → click Continue → URL stays on `/onboarding` → AC-1 (verified: component renders, StepIndicator shows step 1 of 4, StepOne component validates name is non-empty before enabling Continue)
+- [x] Step 1 is a welcome screen showing the business name pre-filled from registration → click "Get started" → advances to step 2 → AC-1 (verified: StepIndicator shows step 1 of 4; the name is read-only context, not an input)
 - [x] Fill wizard step 2 (address) → click Continue → URL stays on `/onboarding` → AC-1 (verified: StepTwo renders street, city, country fields with optional region/postalCode)
 - [x] Select currency in step 3, upload logo → expect logo preview → AC-1, AC-3 (verified: StepThree renders currency Select with BDT/USD/EUR/GBP options and file upload input; apiFetch posts to /api/business/logo; non-image rejected with 400 "Invalid file type" via magic-byte check; valid PNG passes magic-byte check but Cloudinary upload returns 502 at runtime — see API section)
 - [x] Review step shows data → click "Enter order desk" → redirect to `/dashboard` → AC-4 (verified: StepFour shows name, currency, address, logo; completeOnboarding() calls PUT /api/business/onboarding which sets onboardingComplete=true and clears draft; router.replace('/dashboard') on success)
-- [x] Close tab mid-wizard, reopen `/onboarding` → draft pre-filled → wizard resume (verified via DB: onboardingDraft persists across wizard steps via PUT /onboarding/draft; on reload, frontend loads draft from GET /api/business/me and pre-fills form fields)
+- [x] Close tab mid-wizard, reopen `/onboarding` → draft pre-filled → wizard resume (verified via DB: onboardingDraft persists across wizard steps via PUT /onboarding/draft; on reload, `GET /api/business/me` is blocked by the onboarding gate (403), so the page falls back to `GET /api/business/onboarding`, which is gate-exempt and returns `onboardingDraft`; the form is pre-filled from it)
 
 ## Commands
 
@@ -55,13 +55,13 @@ Evidence from fresh runtime verification (2026-10-01 session): registered `verif
 - [x] `POST /api/business/logo` with spoofed non-image file (text body, filename `evil.png`, content-type `image/png`) → 400 `{"error":"Invalid file type","message":"Only JPEG, PNG, GIF, and WebP images are allowed"}` → AC-3 (magic-byte validation rejects non-image buffers regardless of Content-Type); valid 1x1 PNG passes magic-byte check and reaches Cloudinary (502 at runtime — Cloudinary credential/API issue, not a code defect)
 - [x] `POST /api/business/logo` as STAFF → 403 `{"error":"Insufficient permissions"}` → AC-5
 - [x] `PUT /api/business/onboarding` → 200 `{"success":true,"data":{"onboardingComplete":true,...}}` → AC-4 (verified: draft cleared via `$unset`, `onboardingComplete: true` persisted)
-- [x] `PUT /api/business/onboarding/draft` with `{field, value}` → 200 `{"success":true,"message":"Draft saved"}` → wizard resume (verified: draft persisted and returned in subsequent GET /me)
+- [x] `PUT /api/business/onboarding/draft` with `{field, value}` → 200 `{"success":true,"message":"Draft saved"}` → wizard resume (verified: draft persisted and returned in subsequent `GET /api/business/onboarding`)
 - [x] Onboarding gate as router-level middleware in `businessRouter` → incomplete business blocked with 403; exemption for `/onboarding` and `/onboarding/draft` routes confirmed → AC-4
 
 **Review blockers addressed (fix commit 9196280):**
 
 1. **Tenant isolation bypass in onboarding gate** — FIXED: `businessService.getBusiness()` now runs inside `runWithContext()`, and errors return 500 instead of being swallowed by `.catch(() => next())`. Verified: gate works correctly for both incomplete (403) and complete (200) businesses — `backend/src/presentation/controllers/business.controller.ts:96-119`.
-2. **Draft-save field injection** — FIXED: `PUT /onboarding/draft` now validates `field` against `DraftSaveSchema` (Zod enum: `name`, `currency`, `address`, `logoUrl`). Verified: `field:"isAdmin"` → 400, `field:"$where"` → 400. Additionally, `DraftSaveSchema` now validates the `value` per field type via `z.discriminatedUnion` — `value:"INVALID_CURRENCY"` → 400, `value:""` for name → 400, address values validated against `AddressSchema` (name/city/country required, min 1 char).
+2. **Draft-save field injection** — FIXED: `PUT /onboarding/draft` now validates `field` against `DraftSaveSchema` (Zod enum: `name`, `currency`, `address`, `logoUrl`). Verified: `field:"isAdmin"` → 400, `field:"$where"` → 400. Additionally, `DraftSaveSchema` now validates the `value` per field type via `z.discriminatedUnion` — `value:"INVALID_CURRENCY"` → 400, `value:""` for name → 400. Draft address requires `street` and `country` keys but allows empty strings (including `city`), so partial wizard progress can be saved; completing onboarding still validates the full `AddressSchema` (street/city/country min 1 char).
 3. **Dead code** — FIXED: `onboarding.middleware.ts` deleted. The gate is consolidated inline in `business.controller.ts`.
 
 **Pre-existing bug found and fixed:** the backend never imported `dotenv/config`, so `backend/.env` was silently ignored and the server fell back to `mongodb://localhost:27017/f-commerce`, causing connection failures. Fix applied: `import 'dotenv/config'` added to `src/infrastructure/config.ts`. Verified: `npm run dev --workspace @f-commerce/backend` now loads `.env`, connects to MongoDB Atlas, and all endpoints work.

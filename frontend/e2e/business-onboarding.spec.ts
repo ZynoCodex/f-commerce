@@ -83,7 +83,7 @@ test.describe('business onboarding flow', () => {
     expect(businessId).toBeTruthy();
 
     // Complete onboarding via API
-    await apiRequest.post('/api/business/onboarding', {
+    await apiRequest.put('/api/business/onboarding', {
       data: {
         name: 'Completed E2E Co',
         currency: 'USD',
@@ -113,11 +113,9 @@ test.describe('business onboarding flow', () => {
 
     await page.goto('/onboarding');
 
-    // Step 1: business name
-    const name = page.getByRole('textbox', { name: /business name/i });
-    await expect(page.getByRole('button', { name: /^continue$/i })).toBeDisabled();
-    await name.fill('Fresh E2E Co');
-    await page.getByRole('button', { name: /^continue$/i }).click();
+    // Step 1: welcome screen with the name pre-filled from registration
+    await page.getByRole('heading', { name: /welcome, fresh e2e co/i }).waitFor();
+    await page.getByRole('button', { name: /get started/i }).click();
 
     // Step 2: address
     await page.getByRole('heading', { name: /billing address/i }).waitFor();
@@ -150,10 +148,9 @@ test.describe('business onboarding flow', () => {
 
     await page.goto('/onboarding');
 
-    // Fill step 1
-    const name = page.getByRole('textbox', { name: /business name/i });
-    await name.fill('Logo E2E Co');
-    await page.getByRole('button', { name: /^continue$/i }).click();
+    // Step 1: welcome screen
+    await page.getByRole('heading', { name: /welcome, logo e2e co/i }).waitFor();
+    await page.getByRole('button', { name: /get started/i }).click();
 
     // Fill step 2
     await page.getByRole('heading', { name: /billing address/i }).waitFor();
@@ -196,7 +193,7 @@ test.describe('business onboarding flow', () => {
     );
 
     // Complete onboarding first
-    await apiRequest.post('/api/business/onboarding', {
+    await apiRequest.put('/api/business/onboarding', {
       data: {
         name: 'Settings E2E Co',
         currency: 'USD',
@@ -213,7 +210,7 @@ test.describe('business onboarding flow', () => {
     await name.fill('Renamed E2E');
     await page.getByRole('button', { name: /save changes/i }).click();
 
-    await expect(page.getByRole('status', { name: /profile updated/i })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /profile updated/i })).toBeVisible();
   });
 
   test('draft saves and resumes on next visit', async ({ page, request: apiRequest }) => {
@@ -225,31 +222,28 @@ test.describe('business onboarding flow', () => {
 
     await setAuthState(page, accessToken, businessId);
 
-    // Start onboarding, fill step 1, then navigate away
+    // Start onboarding and partially fill the address
     await page.goto('/onboarding');
-    const name = page.getByRole('textbox', { name: /business name/i });
-    await name.fill('Draft E2E Co');
-    await page.getByRole('button', { name: /^continue$/i }).click();
+    await page.getByRole('heading', { name: /welcome, draft e2e co/i }).waitFor();
+    await page.getByRole('button', { name: /get started/i }).click();
 
-    // Fill partial address (incomplete draft)
-    await page.getByRole('heading', { name: /billing address/i }).waitFor();
+    const draftSaved = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/business/onboarding/draft') && res.request().method() === 'PUT',
+    );
     await page.getByRole('textbox', { name: /street/i }).fill('50 Draft Lane');
-    // Don't fill city - just wait for draft to save
+    await draftSaved;
 
-    // Reload the page
     await page.reload();
-    await page.goto('/onboarding');
 
-    // Should show the business name already filled (from draft)
-    const nameField = page.getByRole('textbox', { name: /business name/i });
-    await expect(nameField).toHaveValue('Draft E2E Co');
+    // Draft values should be restored on the next visit
+    await page.getByRole('heading', { name: /welcome, draft e2e co/i }).waitFor();
+    await page.getByRole('button', { name: /get started/i }).click();
+    await expect(page.getByRole('textbox', { name: /street/i })).toHaveValue('50 Draft Lane');
 
-    // Continue the flow
-    await page.getByRole('button', { name: /^continue$/i }).click();
     await page.getByRole('textbox', { name: /city/i }).fill('Dhaka');
     await page.getByRole('button', { name: /^continue$/i }).click();
 
-    // Should be able to complete the wizard
     await page.getByRole('heading', { name: /your currency and logo/i }).waitFor();
   });
 });

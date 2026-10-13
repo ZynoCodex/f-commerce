@@ -87,11 +87,16 @@ businessRouter.use((req, res, next) => {
   // they are actually targeting, not always memberships[0].
   const businessId = req.headers['x-business-id'] as string | undefined;
   if (!businessId) {
-    res.status(400).json({ error: 'Missing x-business-id header', message: 'Missing x-business-id header' });
+    res
+      .status(400)
+      .json({ error: 'Missing x-business-id header', message: 'Missing x-business-id header' });
     return;
   }
 
-  const user = req.user as { userId: string; memberships: { businessId: string; role: 'OWNER' | 'STAFF' }[] };
+  const user = req.user as {
+    userId: string;
+    memberships: { businessId: string; role: 'OWNER' | 'STAFF' }[];
+  };
   const membership = user?.memberships?.find((m) => m.businessId === businessId);
 
   // Reject callers who are not a member of the business they are targeting.
@@ -163,6 +168,41 @@ businessRouter.get(
           onboardingDraft: business.onboardingDraft,
         },
         message: 'Business profile retrieved',
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  },
+);
+
+businessRouter.get(
+  '/onboarding',
+  requireBusinessRole(['OWNER']),
+  async (req: Request, res: Response) => {
+    try {
+      const businessId = getTenantId();
+      if (!businessId) {
+        res.status(400).json({ error: 'No business context', message: 'Missing business context' });
+        return;
+      }
+
+      const business = await businessService.getBusiness(businessId);
+      if (!business) {
+        res.status(404).json({ error: 'Business not found', message: 'Business not found' });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          name: business.name,
+          currency: business.currency,
+          logoUrl: business.logoUrl ?? null,
+          address: business.address ?? null,
+          onboardingComplete: business.onboardingComplete,
+          onboardingDraft: business.onboardingDraft ?? null,
+        },
+        message: 'Onboarding state retrieved',
       });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

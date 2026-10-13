@@ -60,13 +60,20 @@ describe('DraftSaveSchema', () => {
   });
 
   it('validates currency value against CurrencyEnum', () => {
-    expect(DraftSaveSchema.safeParse({ field: 'currency', value: 'INVALID_CURRENCY' }).success).toBe(false);
+    expect(
+      DraftSaveSchema.safeParse({ field: 'currency', value: 'INVALID_CURRENCY' }).success,
+    ).toBe(false);
     expect(DraftSaveSchema.safeParse({ field: 'currency', value: 'USD' }).success).toBe(true);
   });
 
-  it('validates address value against AddressSchema', () => {
-    const badAddress = { street: '', city: '', country: '' };
-    expect(DraftSaveSchema.safeParse({ field: 'address', value: badAddress }).success).toBe(false);
+  it('requires draft address street and country but allows an incomplete city', () => {
+    const missingCity = { street: '123 Main', country: 'Bangladesh' };
+    expect(DraftSaveSchema.safeParse({ field: 'address', value: missingCity }).success).toBe(false);
+
+    const partialAddress = { street: '50 Draft Lane', city: '', country: 'Bangladesh' };
+    expect(DraftSaveSchema.safeParse({ field: 'address', value: partialAddress }).success).toBe(
+      true,
+    );
 
     const goodAddress = { street: '123 Main', city: 'Dhaka', country: 'Bangladesh' };
     expect(DraftSaveSchema.safeParse({ field: 'address', value: goodAddress }).success).toBe(true);
@@ -74,7 +81,10 @@ describe('DraftSaveSchema', () => {
 
   it('validates logoUrl value as a URL or empty string', () => {
     expect(DraftSaveSchema.safeParse({ field: 'logoUrl', value: 'not-a-url' }).success).toBe(false);
-    expect(DraftSaveSchema.safeParse({ field: 'logoUrl', value: 'https://example.com/logo.png' }).success).toBe(true);
+    expect(
+      DraftSaveSchema.safeParse({ field: 'logoUrl', value: 'https://example.com/logo.png' })
+        .success,
+    ).toBe(true);
     expect(DraftSaveSchema.safeParse({ field: 'logoUrl', value: '' }).success).toBe(true);
   });
 
