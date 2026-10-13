@@ -94,9 +94,7 @@ describe('OnboardingPage', () => {
       </ThemeBoundary>,
     );
 
-    expect(
-      await screen.findByRole('heading', { name: /welcome/i }),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome/i })).toBeVisible();
     expect(screen.getByText('Step 1 of 4')).toBeVisible();
     expect(screen.getByRole('button', { name: /get started/i })).toBeEnabled();
   });
@@ -165,7 +163,7 @@ describe('OnboardingPage', () => {
     expect(greeting).toBeVisible();
   });
 
-  it('pre-fills business name from auth profile when business/me returns 403', async () => {
+  it('pre-fills business name from onboarding endpoint when business/me returns 403', async () => {
     const fetchMock = vi
       .fn()
       // First call: GET /api/business/me returns 403 (onboarding required)
@@ -175,17 +173,12 @@ describe('OnboardingPage', () => {
           message: 'Please complete your business profile before accessing this resource',
         }),
       )
-      // Second call: GET /api/auth/me returns business name from registration
+      // Second call: GET /api/business/onboarding returns the business name from registration
       .mockResolvedValueOnce(
         jsonResponse(200, {
-          user: { id: 'u1', email: 'test@example.com', name: 'Test User', isActive: true },
-          businesses: [
-            {
-              businessId: { _id: 'b1', name: 'Registered Biz Name' },
-              role: 'OWNER',
-              status: 'ACTIVE',
-            },
-          ],
+          success: true,
+          data: { name: 'Registered Biz Name', onboardingDraft: null },
+          message: 'Onboarding retrieved',
         }),
       );
     vi.stubGlobal('fetch', fetchMock);
@@ -260,9 +253,7 @@ describe('OnboardingPage', () => {
 
     // a successful upload POSTs to the logo endpoint and shows the preview img
     await waitFor(() => {
-      expect(
-        fetchMock.mock.calls.some((c) => c[0] === '/api/business/logo'),
-      ).toBe(true);
+      expect(fetchMock.mock.calls.some((c) => c[0] === '/api/business/logo')).toBe(true);
     });
     expect(screen.getByRole('img', { name: /logo preview/i })).toBeVisible();
   });
@@ -294,9 +285,7 @@ describe('OnboardingPage', () => {
     await user.click(finishBtn);
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
-    const onboardingCall = fetchMock.mock.calls.find(
-      (c) => c[0] === '/api/business/onboarding',
-    );
+    const onboardingCall = fetchMock.mock.calls.find((c) => c[0] === '/api/business/onboarding');
     expect(onboardingCall).toBeDefined();
     expect(onboardingCall?.[1]?.method).toBe('PUT');
   });
@@ -319,9 +308,9 @@ describe('OnboardingPage', () => {
   });
 
   it('saves draft when user enters address in step 2', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse(200, { success: true, data: incompleteBusiness }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { success: true, data: incompleteBusiness }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -340,20 +329,19 @@ describe('OnboardingPage', () => {
     await user.type(streetField, '123 New St');
 
     // Wait for debounced draft save (500ms debounce, needs longer waitFor timeout)
-    await waitFor(() => {
-      const draftCall = fetchMock.mock.calls.find(
-        (call) =>
-          call[0] === '/api/business/onboarding/draft' &&
-          call[1]?.method === 'PUT',
-      );
-      expect(draftCall).toBeTruthy();
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        const draftCall = fetchMock.mock.calls.find(
+          (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
+        );
+        expect(draftCall).toBeTruthy();
+      },
+      { timeout: 2000 },
+    );
 
     // Verify the draft save payload includes the address
     const draftCall = fetchMock.mock.calls.find(
-      (call) =>
-        call[0] === '/api/business/onboarding/draft' &&
-        call[1]?.method === 'PUT',
+      (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
     );
     const draftBody = JSON.parse(draftCall![1].body);
     expect(draftBody.field).toBe('address');
@@ -404,8 +392,6 @@ describe('OnboardingPage', () => {
       </ThemeBoundary>,
     );
 
-    expect(
-      await screen.findByRole('heading', { name: 'Welcome, Unique Shop!' }),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Welcome, Unique Shop!' })).toBeVisible();
   });
 });
