@@ -1,0 +1,146 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Field, FormMessage, Input } from '@/components/ui/primitives';
+import { apiFetch, setAuth } from '@/lib/auth-client';
+import { useRequireAuth } from '@/lib/auth-guard';
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  // Authenticated users shouldn't see the sign-in / register form.
+  // Note: all hooks below must stay unconditional so hook order is stable
+  // across the ready/not-ready renders.
+  const ready = useRequireAuth({ requireAuth: false });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const endpoint = isRegistering ? '/api/auth/register' : '/api/auth/login';
+      const body: Record<string, string> = { email, password };
+      if (isRegistering) {
+        body.name = email.split('@')[0];
+        body.businessName = businessName;
+      }
+
+      const res = await apiFetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Authentication failed');
+      }
+
+      const data = await res.json();
+      const token = data.accessToken;
+
+      // Use businessId from response if available (extracted from JWT by backend)
+      // Fallback to decoding JWT client-side for backward compatibility
+      let businessId = data.businessId;
+      if (!businessId && token?.split('.').length === 3) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          businessId = payload.memberships?.[0]?.businessId;
+        } catch {
+          // Token decode failed, continue without businessId
+        }
+      }
+
+      if (!businessId) throw new Error('No business association found');
+
+      setAuth({ accessToken: token, businessId });
+      router.replace('/onboarding');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Render a lightweight placeholder while redirecting so React swaps the
+  // tree cleanly instead of leaving a null shell behind.
+  if (!ready)
+    return <div className="flex min-h-screen items-center justify-center bg-canvas p-4" />;
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-sm">
+        <h1 className="text-2xl font-semibold text-ink mb-2">
+          {isRegistering ? 'Create your account' : 'Welcome back'}
+        </h1>
+        <p className="text-sm text-body mb-6">
+          {isRegistering ? 'Register to start managing your orders.' : 'Sign in to your account.'}
+        </p>
+
+        {error && <FormMessage id="login-error">{error}</FormMessage>}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {isRegistering && (
+            <Field label="Business name" htmlFor="business-name">
+              <Input
+                id="business-name"
+                type="text"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="Maya Traders"
+                required
+              />
+            </Field>
+          )}
+
+          <Field label="Email" htmlFor="email">
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </Field>
+
+          <Field label="Password" htmlFor="password">
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              required
+              minLength={8}
+            />
+          </Field>
+
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'Working...' : isRegistering ? 'Create account' : 'Sign in'}
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-body">
+          {isRegistering ? 'Already have an account?' : "Don't have an account yet?"}
+          <button
+            className="ml-1 text-sky-strong hover:underline"
+            onClick={() => setIsRegistering(!isRegistering)}
+            type="button"
+          >
+            {isRegistering ? 'Sign in' : 'Register'}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}

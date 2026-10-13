@@ -1,0 +1,587 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
+import { apiFetch } from '@/lib/auth-client';
+import { useRequireAuth } from '@/lib/auth-guard';
+import type { BusinessProfile } from '@f-commerce/contracts';
+
+type Step = 1 | 2 | 3 | 4;
+
+type Address = {
+  street: string;
+  city: string;
+  region?: string;
+  postalCode?: string;
+  country: string;
+};
+
+type OnboardingForm = {
+  name: string;
+  currency: BusinessProfile['currency'];
+  address: Address;
+  logoUrl: string;
+};
+
+type DraftField = 'currency' | 'address';
+
+// Cache to track saved draft values and avoid redundant API calls
+const savedDraftCache: Record<DraftField, string> = {
+  currency: '',
+  address: '',
+};
+
+let pendingSave: { field: DraftField; value: unknown } | null = null;
+let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleDraftSave(field: DraftField, value: unknown) {
+  const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+  // Skip if value hasn't changed
+  if (savedDraftCache[field] === serialized) return;
+  savedDraftCache[field] = serialized;
+
+  // Store the most recent pending save
+  pendingSave = { field, value };
+
+  // Reset debounce timer
+  if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+
+  draftDebounceTimer = setTimeout(async () => {
+    if (!pendingSave) return;
+
+    try {
+      await apiFetch('/api/business/onboarding/draft', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field: pendingSave.field,
+          value: pendingSave.value,
+        }),
+      });
+    } catch {
+      // Silently fail - draft is for convenience, not critical
+    }
+
+    pendingSave = null;
+  }, 500); // 500ms debounce
+}
+
+type BusinessData = {
+  name: string;
+  currency: string;
+  logoUrl: string | null;
+  address: Address | null;
+  onboardingComplete: boolean;
+  onboardingDraft?: OnboardingForm | null;
+};
+
+export default function OnboardingPage() {
+  const router = useRouter();
+
+  // Gate the whole flow behind authentication before any API call.
+  // All hooks below are called unconditionally so hook order is stable
+  // across the ready/not-ready renders.
+  const ready = useRequireAuth();
+  const [step, setStep] = useState<Step>(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [business, setBusiness] = useState<BusinessData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [form, setForm] = useState<OnboardingForm>({
+    name: '',
+    currency: 'BDT',
+    address: {
+      street: '',
+      city: '',
+      region: '',
+      postalCode: '',
+      country: 'Bangladesh',
+    },
+    logoUrl: '',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void cancelled;
+
+    apiFetch('/api/business/me', {
+      method: 'GET',
+    })
+      .then(async (res) => {
+        if (res.status === 403 && res.headers.get('content-type')?.includes('json')) {
+          return res.json().then((data) => {
+            if (data.error?.includes('Onboarding') || data.message?.includes('Onboarding')) {
+              return null;
+            }
+            throw new Error('Access denied');
+          });
+        }
+        if (!res.ok) throw new Error('Failed to load business');
+        return res.json();
+      })
+      .then(async (data) => {
+        if (!cancelled && data) {
+          setBusiness(data.data);
+          if (data.data.onboardingComplete) {
+            router.replace('/dashboard');
+          }
+
+          // Always pre-fill the business name from the DB record
+          // (it was already provided at registration)
+          const businessName = data.data.name || '';
+
+          if (data.data.onboardingDraft) {
+            const draft = data.data.onboardingDraft;
+            const currency = (draft.currency ||
+              data.data.currency ||
+              'BDT') as BusinessProfile['currency'];
+            const address = draft.address || data.data.address || form.address;
+            const logoUrl = draft.logoUrl || data.data.logoUrl || '';
+
+            setForm({
+              name: businessName,
+              currency,
+              address,
+              logoUrl,
+            });
+
+            // Update draft cache with loaded values
+            savedDraftCache.currency = currency;
+            savedDraftCache.address = JSON.stringify(address);
+
+            if (draft.logoUrl || data.data.logoUrl) {
+              setLogoPreview(draft.logoUrl || data.data.logoUrl || null);
+            }
+          } else {
+            // No draft yet — just pre-fill the name from DB
+            setForm((prev) => ({ ...prev, name: businessName }));
+          }
+        } else if (!cancelled && !data) {
+          // 403 Onboarding required — fetch business name from auth profile
+          // to pre-fill step 1 (it was provided at registration)
+          const authRes = await apiFetch('/api/auth/me', { method: 'GET' });
+          if (authRes.ok) {
+            const authData: {
+              businesses?: Array<{
+                businessId: string | { _id: string; name?: string };
+                name?: string;
+              }>;
+            } = await authRes.json();
+            const businessId = window.localStorage.getItem('businessId') ?? '';
+            const membership =
+              authData.businesses?.find((business) => {
+                const id =
+                  typeof business.businessId === 'string'
+                    ? business.businessId
+                    : business.businessId._id;
+                return id === businessId;
+              }) ?? authData.businesses?.[0];
+            const name =
+              typeof membership?.businessId === 'object'
+                ? membership.businessId.name
+                : membership?.name;
+            if (name) {
+              setForm((prev) => ({ ...prev, name }));
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      // Clear pending draft save on unmount
+      if (draftDebounceTimer) {
+        clearTimeout(draftDebounceTimer);
+        draftDebounceTimer = null;
+      }
+      pendingSave = null;
+    };
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!ready) return <div className="p-8">Loading your profile...</div>;
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File must be under 2MB');
+      return;
+    }
+
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await apiFetch('/api/business/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Upload failed');
+      }
+
+      const result = await res.json();
+      setForm({ ...form, logoUrl: result.data.logoUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch('/api/business/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          currency: form.currency,
+          address: form.address,
+          logoUrl: form.logoUrl,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to complete onboarding');
+      }
+
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-8">Loading your profile...</div>;
+  }
+
+  if (business?.onboardingComplete) {
+    return null;
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-lg">
+        <StepIndicator step={step} />
+
+        {error && <FormMessage id="onboarding-error">{error}</FormMessage>}
+
+        {step === 1 && <StepOne form={form} onNext={() => setStep(2)} />}
+        {step === 2 && (
+          <StepTwo
+            form={form}
+            setForm={setForm}
+            onNext={() => setStep(3)}
+            onBack={() => setStep(1)}
+          />
+        )}
+        {step === 3 && (
+          <StepThree
+            form={form}
+            setForm={setForm}
+            onNext={() => setStep(4)}
+            onBack={() => setStep(2)}
+            logoPreview={logoPreview}
+            logoUploading={logoUploading}
+            onFileChange={handleFileChange}
+          />
+        )}
+        {step === 4 && (
+          <StepFour
+            form={form}
+            onBack={() => setStep(3)}
+            onSubmit={completeOnboarding}
+            submitting={submitting}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StepIndicator({ step }: { step: Step }) {
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between">
+        {[1, 2, 3, 4].map((s) => (
+          <div key={s} className="flex items-center">
+            <div
+              aria-hidden="true"
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                s <= step ? 'bg-sky text-on-sky' : 'bg-surface-muted text-body'
+              }`}
+            >
+              {s}
+            </div>
+            {s < 4 && (
+              <div className={`ml-2 h-1 w-8 ${s < step ? 'bg-sky' : 'bg-surface-muted'}`} />
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-sm text-muted">Step {step} of 4</p>
+    </div>
+  );
+}
+
+function StepOne({ form, onNext }: { form: OnboardingForm; onNext: () => void }) {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold text-ink">
+        Welcome{form.name ? `, ${form.name}` : ''}!
+      </h1>
+      <p className="text-sm text-body">Let&apos;s finish setting up your business.</p>
+
+      <Button onClick={onNext}>Get started</Button>
+    </div>
+  );
+}
+
+function StepTwo({
+  form,
+  setForm,
+  onNext,
+  onBack,
+}: {
+  form: OnboardingForm;
+  setForm: React.Dispatch<React.SetStateAction<OnboardingForm>>;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  // Save draft when address changes
+  const handleAddressChange = (field: keyof Address, value: string) => {
+    const newAddress = { ...form.address, [field]: value };
+    setForm({ ...form, address: newAddress });
+    scheduleDraftSave('address', newAddress);
+  };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold text-ink">Billing address</h1>
+      <p className="text-sm text-body">Where should we send invoices and receipts?</p>
+
+      <Field label="Street" htmlFor="street">
+        <Input
+          id="street"
+          type="text"
+          value={form.address.street}
+          onChange={(e) => handleAddressChange('street', e.target.value)}
+          placeholder="123 Main Street"
+        />
+      </Field>
+
+      <Field label="City" htmlFor="city">
+        <Input
+          id="city"
+          type="text"
+          value={form.address.city}
+          onChange={(e) => handleAddressChange('city', e.target.value)}
+          placeholder="Dhaka"
+        />
+      </Field>
+
+      <Field label="Region / State" htmlFor="region" description="Optional">
+        <Input
+          id="region"
+          type="text"
+          value={form.address.region || ''}
+          onChange={(e) => handleAddressChange('region', e.target.value)}
+          placeholder="Dhaka Division"
+        />
+      </Field>
+
+      <Field label="Postal code" htmlFor="postal-code" description="Optional">
+        <Input
+          id="postal-code"
+          type="text"
+          value={form.address.postalCode || ''}
+          onChange={(e) => handleAddressChange('postalCode', e.target.value)}
+          placeholder="1000"
+        />
+      </Field>
+
+      <Field label="Country" htmlFor="country">
+        <Input
+          id="country"
+          type="text"
+          value={form.address.country}
+          onChange={(e) => handleAddressChange('country', e.target.value)}
+        />
+      </Field>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={onBack}>
+          Back
+        </Button>
+        <Button onClick={onNext}>Continue</Button>
+      </div>
+    </div>
+  );
+}
+
+function StepThree({
+  form,
+  setForm,
+  onNext,
+  onBack,
+  logoPreview,
+  logoUploading,
+  onFileChange,
+}: {
+  form: OnboardingForm;
+  setForm: React.Dispatch<React.SetStateAction<OnboardingForm>>;
+  onNext: () => void;
+  onBack: () => void;
+  logoPreview: string | null;
+  logoUploading: boolean;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  // Save draft when currency changes
+  const handleCurrencyChange = (value: BusinessProfile['currency']) => {
+    setForm({ ...form, currency: value });
+    scheduleDraftSave('currency', value);
+  };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold text-ink">Your currency and logo</h1>
+      <p className="text-sm text-body">
+        This is how your customers will see prices and identify your business.
+      </p>
+
+      <Field label="Currency" htmlFor="currency">
+        <Select
+          id="currency"
+          value={form.currency}
+          onChange={(e) => handleCurrencyChange(e.target.value as BusinessProfile['currency'])}
+        >
+          <option value="BDT">BDT - Bangladeshi Taka</option>
+          <option value="USD">USD - US Dollar</option>
+          <option value="EUR">EUR - Euro</option>
+          <option value="GBP">GBP - British Pound</option>
+        </Select>
+      </Field>
+
+      <Field label="Business logo" htmlFor="logo-upload" description="JPEG, PNG, or WebP. Max 5MB.">
+        <label
+          className="flex h-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-surface-muted text-center hover:bg-surface"
+          htmlFor="logo-upload"
+        >
+          {logoPreview ? (
+            <img
+              alt="Logo preview"
+              className="h-20 w-20 rounded object-contain"
+              src={logoPreview}
+            />
+          ) : (
+            <span className="text-sm text-muted">
+              {logoUploading ? 'Uploading...' : 'Click to upload a logo'}
+            </span>
+          )}
+          <input
+            accept="image/*"
+            className="sr-only"
+            id="logo-upload"
+            onChange={onFileChange}
+            type="file"
+          />
+        </label>
+        {logoUploading && <p className="text-xs text-muted">Uploading...</p>}
+      </Field>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={onBack}>
+          Back
+        </Button>
+        <Button onClick={onNext}>Continue</Button>
+      </div>
+    </div>
+  );
+}
+
+function StepFour({
+  form,
+  onBack,
+  onSubmit,
+  submitting,
+}: {
+  form: OnboardingForm;
+  onBack: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold text-ink">Review and finish</h1>
+      <p className="text-sm text-body">Check your details before entering the order desk.</p>
+
+      <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-center gap-4">
+          {form.logoUrl ? (
+            <img alt="Logo" className="h-12 w-12 rounded object-contain" src={form.logoUrl} />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded bg-sky-soft text-sky-strong font-mono">
+              {form.name.slice(0, 2).toUpperCase() || 'BT'}
+            </div>
+          )}
+          <div>
+            <p className="font-semibold text-ink">{form.name || 'Unnamed business'}</p>
+            <p className="text-sm text-muted">{form.currency}</p>
+          </div>
+        </div>
+
+        {form.address.street && (
+          <div className="grid gap-1 text-sm">
+            <p className="text-body">{form.address.street}</p>
+            <p className="text-body">
+              {form.address.city}
+              {form.address.region && `, ${form.address.region}`}
+              {form.address.postalCode && ` ${form.address.postalCode}`}
+            </p>
+            <p className="text-body">{form.address.country}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={onBack} disabled={submitting}>
+          Back
+        </Button>
+        <Button onClick={onSubmit} disabled={submitting}>
+          {submitting ? 'Finishing...' : 'Enter order desk'}
+        </Button>
+      </div>
+    </div>
+  );
+}

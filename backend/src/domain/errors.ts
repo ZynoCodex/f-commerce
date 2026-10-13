@@ -35,3 +35,9 @@ export class ConflictError extends DomainError {
     super(message);
   }
 }
+
+export class BadRequestError extends DomainError {
+  constructor(message: string = 'Invalid request') {
+    super(message);
+  }
+}

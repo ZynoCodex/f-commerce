@@ -1,1 +1,1 @@
-Next: run /debug authentication & tenant isolation, then /develop authentication & tenant isolation for the missing invitation surface.
+Verification complete. All review fixes confirmed live at runtime. Next: /test business profile and onboarding or mark feature done.

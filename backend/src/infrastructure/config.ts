@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -11,6 +12,10 @@ const envSchema = z.object({
     .default('super-secret-jwt-refresh-key-replace-in-production'),
   OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
   OAUTH_FACEBOOK_CLIENT_ID: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().default(''),
+  CLOUDINARY_API_KEY: z.string().default(''),
+  CLOUDINARY_API_SECRET: z.string().default(''),
+  CORS_ORIGINS: z.string().default('http://localhost:3000'),
 });
 
 const parsed = envSchema.safeParse(process.env);

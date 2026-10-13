@@ -59,12 +59,23 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     const { email, password, name, businessName } = parsed.data;
     const tokens = await authService.register(email, password, name, businessName);
 
+    // Extract businessId from the access token payload
+    let businessId: string | undefined;
+    try {
+      const payload = tokens.accessToken.split('.')[1];
+      if (payload) {
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+      }
+    } catch {
+      // Token decode failed, leave businessId undefined
+    }
+
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-    res.status(201).json({ accessToken: tokens.accessToken });
+    res.status(201).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof DuplicateEmailError) {
       res.status(409).json({ error: error.message });
@@ -84,12 +95,23 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const { email, password } = parsed.data;
     const tokens = await authService.login(email, password);
 
+    // Extract businessId from the access token payload
+    let businessId: string | undefined;
+    try {
+      const payload = tokens.accessToken.split('.')[1];
+      if (payload) {
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+      }
+    } catch {
+      // Token decode failed, leave businessId undefined
+    }
+
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-    res.status(200).json({ accessToken: tokens.accessToken });
+    res.status(200).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message });
@@ -116,12 +138,23 @@ authRouter.post('/oauth/:provider', async (req: Request, res: Response) => {
 
     const tokens = await authService.oauthLogin(email, name, provider, providerId);
 
+    // Extract businessId from the access token payload
+    let businessId: string | undefined;
+    try {
+      const payload = tokens.accessToken.split('.')[1];
+      if (payload) {
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+      }
+    } catch {
+      // Token decode failed, leave businessId undefined
+    }
+
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-    res.status(200).json({ accessToken: tokens.accessToken });
+    res.status(200).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message });
