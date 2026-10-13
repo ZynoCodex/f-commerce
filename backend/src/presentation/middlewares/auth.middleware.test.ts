@@ -70,7 +70,7 @@ describe('Auth Middleware', () => {
     it('returns 401 if no user attached by requireAuth', () => {
       req.headers!['x-business-id'] = 'biz1';
       // Explicitly set user to undefined to simulate no auth
-      (req as any).user = undefined;
+      req.user = undefined;
 
       const middleware = requireBusinessRole(['OWNER']);
       middleware(req as Request, res as Response, next);
