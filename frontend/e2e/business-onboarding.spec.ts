@@ -55,10 +55,10 @@ test.describe('business onboarding flow', () => {
     accessToken: string,
     businessId: string,
   ) {
-    await page.evaluate(
+    await page.addInitScript(
       (auth) => {
-        localStorage.setItem('accessToken', auth.accessToken);
-        localStorage.setItem('businessId', auth.businessId);
+        window.localStorage.setItem('accessToken', auth.accessToken);
+        window.localStorage.setItem('businessId', auth.businessId);
       },
       { accessToken, businessId },
     );
