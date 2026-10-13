@@ -125,7 +125,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold text-ink">Business profile</h1>
         <p className="mt-1 text-sm text-body">

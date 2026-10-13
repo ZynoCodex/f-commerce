@@ -1,7 +1,7 @@
 # 0004. Business profile and onboarding
 
 **Date**: 2026-09-22
-**Status**: Proposed
+**Status**: Accepted
 
 ## Summary
 

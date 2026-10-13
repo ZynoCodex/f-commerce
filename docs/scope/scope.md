@@ -17,7 +17,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3   | Coding standards & tooling        | Foundation | done    |
 | 4   | Design system & UI foundation     | Foundation | done    |
 | 5   | Authentication & tenant isolation | Slice 1    | done    |
-| 6   | Business profile & onboarding     | Slice 1    | planned |
+| 6   | Business profile & onboarding     | Slice 1    | done    |
 | 7   | Customers                         | Slice 1    | planned |
 | 8   | Products & categories             | Slice 2    | planned |
 | 9   | Orders (CRUD + status workflow)   | Slice 2    | planned |
@@ -106,7 +106,7 @@ User auth, JWT tokens, role management (owner/staff), strict multi-tenant data r
       Review [2026-09-20-feat-auth-tenant-isolation](../reviews/2026-09-20-feat-auth-tenant-isolation.md)
 - [x] Document it: `/document authentication & tenant isolation`
 
-### 6. Business profile & onboarding · in-progress (verified)
+### 6. Business profile & onboarding · done
 
 Registration flow creates business account, collects business info (name, logo, currency, address).
 **Done when:** new user can complete onboarding and see their business data isolated from others.

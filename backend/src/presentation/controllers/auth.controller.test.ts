@@ -75,6 +75,24 @@ describe('Auth Controller', () => {
       expect(res.header['set-cookie'][0]).toContain('refreshToken=refresh');
     });
 
+    it('handles malformed JWT token gracefully', async () => {
+      vi.mocked(AuthService.prototype.register).mockResolvedValueOnce({
+        accessToken: 'access.invalid_base64_payload.signature',
+        refreshToken: 'refresh',
+      });
+
+      const res = await request(app).post('/api/auth/register').send({
+        email: 'test@test.com',
+        password: 'password123',
+        name: 'Test User',
+        businessName: 'Test Business',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.accessToken).toBe('access.invalid_base64_payload.signature');
+      expect(res.body.businessId).toBeUndefined();
+    });
+
     it('returns 409 if email exists', async () => {
       vi.mocked(AuthService.prototype.register).mockRejectedValueOnce(
         new DuplicateEmailError('Email already exists'),
@@ -88,6 +106,36 @@ describe('Auth Controller', () => {
       });
 
       expect(res.status).toBe(409);
+    });
+
+    it('returns 400 for invalid email format', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        email: 'invalid-email',
+        password: 'password123',
+        name: 'Test',
+        businessName: 'Test Business',
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for password shorter than 8 characters', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        email: 'test@test.com',
+        password: 'short',
+        name: 'Test',
+        businessName: 'Test Business',
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'test@test.com', password: 'password123' });
+
+      expect(res.status).toBe(400);
     });
   });
 
@@ -120,6 +168,23 @@ describe('Auth Controller', () => {
         .send({ email: 't@t.com', password: 'wrong' });
 
       expect(res.status).toBe(401);
+    });
+
+    it('returns 400 for invalid email format', async () => {
+      const res = await request(app).post('/api/auth/login').send({
+        email: 'not-an-email',
+        password: 'password123',
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for missing password', async () => {
+      const res = await request(app).post('/api/auth/login').send({
+        email: 'test@test.com',
+      });
+
+      expect(res.status).toBe(400);
     });
   });
 
@@ -172,7 +237,7 @@ describe('Auth Controller', () => {
       expect(res.header['set-cookie'][0]).toContain('refreshToken=new_refresh');
     });
 
-    it('returns 401 when refresh token is missing', async () => {
+    it('returns 400 when refresh token cookie is missing', async () => {
       const res = await request(app).post('/api/auth/refresh');
 
       expect(res.status).toBe(400);
@@ -189,6 +254,18 @@ describe('Auth Controller', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('returns 401 for expired or revoked refresh token', async () => {
+      vi.mocked(AuthService.prototype.refresh).mockRejectedValueOnce(
+        new UnauthorizedError('Token expired'),
+      );
+
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', 'refreshToken=expired_token');
+
+      expect(res.status).toBe(401);
+    });
   });
 
   describe('POST /api/auth/logout', () => {
@@ -201,6 +278,27 @@ describe('Auth Controller', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ success: true });
+    });
+
+    it('returns 200 when no refresh token cookie present', async () => {
+      const res = await request(app).post('/api/auth/logout');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true });
+      // AuthService.logout should not be called when no cookie
+      expect(AuthService.prototype.logout).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when logout service fails', async () => {
+      vi.mocked(AuthService.prototype.logout).mockRejectedValueOnce(
+        new Error('Database error'),
+      );
+
+      const res = await request(app)
+        .post('/api/auth/logout')
+        .set('Cookie', 'refreshToken=some_token');
+
+      expect(res.status).toBe(500);
     });
   });
 
@@ -223,7 +321,7 @@ describe('Auth Controller', () => {
       expect(requireAuth).toHaveBeenCalled();
     });
 
-    it('returns 401 when unauthorized', async () => {
+    it('returns 401 when unauthorized via middleware', async () => {
       vi.mocked(requireAuth).mockImplementationOnce((_req, res) => {
         res.status(401).json({ error: 'Unauthorized' });
       });
@@ -231,6 +329,19 @@ describe('Auth Controller', () => {
       const res = await request(app).get('/api/auth/me');
 
       expect(res.status).toBe(401);
+    });
+
+    it('returns 200 with profile data when authenticated', async () => {
+      vi.mocked(AuthService.prototype.getProfile).mockResolvedValueOnce({
+        user: { id: '1', email: 'test@test.com', name: 'Test', isActive: true },
+        businesses: [{ businessId: 'biz-1', role: 'OWNER' }],
+      });
+
+      const res = await request(app).get('/api/auth/me');
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.id).toBe('1');
+      expect(res.body.businesses).toHaveLength(1);
     });
   });
 
