@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 // E2E for the onboarding + settings flow (spec 0004).
@@ -12,7 +12,7 @@ test.describe('business onboarding flow', () => {
 
   // Helper to authenticate a user (register or login) and return auth state
   async function authenticateUser(
-    apiRequest: Parameters<typeof test.request>[0],
+    apiRequest: APIRequestContext,
     email: string,
     businessName: string,
   ) {
@@ -31,7 +31,10 @@ test.describe('business onboarding flow', () => {
       try {
         const payload = Buffer.from(loginData.accessToken.split('.')[1], 'base64').toString();
         const parsed = JSON.parse(payload);
-        return { accessToken: loginData.accessToken, businessId: parsed.memberships?.[0]?.businessId };
+        return {
+          accessToken: loginData.accessToken,
+          businessId: parsed.memberships?.[0]?.businessId,
+        };
       } catch {
         return { accessToken: loginData.accessToken, businessId: loginData.businessId };
       }
@@ -52,10 +55,13 @@ test.describe('business onboarding flow', () => {
     accessToken: string,
     businessId: string,
   ) {
-    await page.evaluate((auth) => {
-      localStorage.setItem('accessToken', auth.accessToken);
-      localStorage.setItem('businessId', auth.businessId);
-    }, { accessToken, businessId });
+    await page.evaluate(
+      (auth) => {
+        localStorage.setItem('accessToken', auth.accessToken);
+        localStorage.setItem('businessId', auth.businessId);
+      },
+      { accessToken, businessId },
+    );
   }
 
   test.beforeEach(async ({ page }) => {
@@ -68,7 +74,11 @@ test.describe('business onboarding flow', () => {
   }) => {
     const email = `completed-${randomUUID().slice(0, 8)}@example.com`;
 
-    const { accessToken, businessId } = await authenticateUser(apiRequest, email, 'Completed E2E Co');
+    const { accessToken, businessId } = await authenticateUser(
+      apiRequest,
+      email,
+      'Completed E2E Co',
+    );
     expect(accessToken).toBeTruthy();
     expect(businessId).toBeTruthy();
 
@@ -173,10 +183,17 @@ test.describe('business onboarding flow', () => {
     await page.getByRole('heading', { name: /review and finish/i }).waitFor();
   });
 
-  test('owner edits the profile from settings and sees confirmation', async ({ page, request: apiRequest }) => {
+  test('owner edits the profile from settings and sees confirmation', async ({
+    page,
+    request: apiRequest,
+  }) => {
     const email = `settings-${randomUUID().slice(0, 8)}@example.com`;
 
-    const { accessToken, businessId } = await authenticateUser(apiRequest, email, 'Settings E2E Co');
+    const { accessToken, businessId } = await authenticateUser(
+      apiRequest,
+      email,
+      'Settings E2E Co',
+    );
 
     // Complete onboarding first
     await apiRequest.post('/api/business/onboarding', {
