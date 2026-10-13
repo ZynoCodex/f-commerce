@@ -24,6 +24,50 @@ type OnboardingForm = {
   logoUrl: string;
 };
 
+type DraftField = 'currency' | 'address';
+
+// Cache to track saved draft values and avoid redundant API calls
+const savedDraftCache: Record<DraftField, string> = {
+  currency: '',
+  address: '',
+};
+
+let pendingSave: { field: DraftField; value: unknown } | null = null;
+let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleDraftSave(field: DraftField, value: unknown) {
+  const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+  // Skip if value hasn't changed
+  if (savedDraftCache[field] === serialized) return;
+  savedDraftCache[field] = serialized;
+
+  // Store the most recent pending save
+  pendingSave = { field, value };
+
+  // Reset debounce timer
+  if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+
+  draftDebounceTimer = setTimeout(async () => {
+    if (!pendingSave) return;
+
+    try {
+      await apiFetch('/api/business/onboarding/draft', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field: pendingSave.field,
+          value: pendingSave.value,
+        }),
+      });
+    } catch {
+      // Silently fail - draft is for convenience, not critical
+    }
+
+    pendingSave = null;
+  }, 500); // 500ms debounce
+}
+
 type BusinessData = {
   name: string;
   currency: string;
@@ -86,29 +130,63 @@ export default function OnboardingPage() {
           if (data.data.onboardingComplete) {
             router.replace('/dashboard');
           }
+
+          // Always pre-fill the business name from the DB record
+          // (it was already provided at registration)
+          const businessName = data.data.name || '';
+
           if (data.data.onboardingDraft) {
             const draft = data.data.onboardingDraft;
+            const currency = (draft.currency ||
+              data.data.currency ||
+              'BDT') as BusinessProfile['currency'];
+            const address = draft.address || data.data.address || form.address;
+            const logoUrl = draft.logoUrl || data.data.logoUrl || '';
+
             setForm({
-              name: draft.name || data.data.name || '',
-              currency: (draft.currency ||
-                data.data.currency ||
-                'BDT') as BusinessProfile['currency'],
-              address: draft.address || data.data.address || form.address,
-              logoUrl: draft.logoUrl || data.data.logoUrl || '',
+              name: businessName,
+              currency,
+              address,
+              logoUrl,
             });
+
+            // Update draft cache with loaded values
+            savedDraftCache.currency = currency;
+            savedDraftCache.address = JSON.stringify(address);
+
             if (draft.logoUrl || data.data.logoUrl) {
               setLogoPreview(draft.logoUrl || data.data.logoUrl || null);
             }
+          } else {
+            // No draft yet — just pre-fill the name from DB
+            setForm((prev) => ({ ...prev, name: businessName }));
           }
         } else if (!cancelled && !data) {
           // 403 Onboarding required — fetch business name from auth profile
           // to pre-fill step 1 (it was provided at registration)
           const authRes = await apiFetch('/api/auth/me', { method: 'GET' });
           if (authRes.ok) {
-            const authData = await authRes.json();
-            const biz = authData.businesses?.[0]?.businessId;
-            if (biz?.name) {
-              setForm((prev) => ({ ...prev, name: biz.name }));
+            const authData: {
+              businesses?: Array<{
+                businessId: string | { _id: string; name?: string };
+                name?: string;
+              }>;
+            } = await authRes.json();
+            const businessId = window.localStorage.getItem('businessId') ?? '';
+            const membership =
+              authData.businesses?.find((business) => {
+                const id =
+                  typeof business.businessId === 'string'
+                    ? business.businessId
+                    : business.businessId._id;
+                return id === businessId;
+              }) ?? authData.businesses?.[0];
+            const name =
+              typeof membership?.businessId === 'object'
+                ? membership.businessId.name
+                : membership?.name;
+            if (name) {
+              setForm((prev) => ({ ...prev, name }));
             }
           }
         }
@@ -124,6 +202,12 @@ export default function OnboardingPage() {
 
     return () => {
       cancelled = true;
+      // Clear pending draft save on unmount
+      if (draftDebounceTimer) {
+        clearTimeout(draftDebounceTimer);
+        draftDebounceTimer = null;
+      }
+      pendingSave = null;
     };
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -137,8 +221,8 @@ export default function OnboardingPage() {
       setError('Only image files are allowed');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File must be under 5MB');
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File must be under 2MB');
       return;
     }
 
@@ -213,7 +297,7 @@ export default function OnboardingPage() {
 
         {error && <FormMessage id="onboarding-error">{error}</FormMessage>}
 
-        {step === 1 && <StepOne form={form} setForm={setForm} onNext={() => setStep(2)} />}
+        {step === 1 && <StepOne form={form} onNext={() => setStep(2)} />}
         {step === 2 && (
           <StepTwo
             form={form}
@@ -271,40 +355,15 @@ function StepIndicator({ step }: { step: Step }) {
   );
 }
 
-function StepOne({
-  form,
-  setForm,
-  onNext,
-}: {
-  form: OnboardingForm;
-  setForm: React.Dispatch<React.SetStateAction<OnboardingForm>>;
-  onNext: () => void;
-}) {
-  const valid = form.name.trim().length > 0;
-
+function StepOne({ form, onNext }: { form: OnboardingForm; onNext: () => void }) {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Tell us about your business</h1>
-      <p className="text-sm text-body">We will use this information to set up your order desk.</p>
+      <h1 className="text-2xl font-semibold text-ink">
+        Welcome{form.name ? `, ${form.name}` : ''}!
+      </h1>
+      <p className="text-sm text-body">Let&apos;s finish setting up your business.</p>
 
-      <Field
-        label="Business name"
-        htmlFor="business-name"
-        error={form.name ? undefined : 'Business name is required'}
-      >
-        <Input
-          id="business-name"
-          type="text"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Maya Traders"
-          aria-invalid={Boolean(form.name)}
-        />
-      </Field>
-
-      <Button onClick={onNext} disabled={!valid}>
-        Continue
-      </Button>
+      <Button onClick={onNext}>Get started</Button>
     </div>
   );
 }
@@ -320,6 +379,13 @@ function StepTwo({
   onNext: () => void;
   onBack: () => void;
 }) {
+  // Save draft when address changes
+  const handleAddressChange = (field: keyof Address, value: string) => {
+    const newAddress = { ...form.address, [field]: value };
+    setForm({ ...form, address: newAddress });
+    scheduleDraftSave('address', newAddress);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-ink">Billing address</h1>
@@ -330,9 +396,7 @@ function StepTwo({
           id="street"
           type="text"
           value={form.address.street}
-          onChange={(e) =>
-            setForm({ ...form, address: { ...form.address, street: e.target.value } })
-          }
+          onChange={(e) => handleAddressChange('street', e.target.value)}
           placeholder="123 Main Street"
         />
       </Field>
@@ -342,7 +406,7 @@ function StepTwo({
           id="city"
           type="text"
           value={form.address.city}
-          onChange={(e) => setForm({ ...form, address: { ...form.address, city: e.target.value } })}
+          onChange={(e) => handleAddressChange('city', e.target.value)}
           placeholder="Dhaka"
         />
       </Field>
@@ -352,9 +416,7 @@ function StepTwo({
           id="region"
           type="text"
           value={form.address.region || ''}
-          onChange={(e) =>
-            setForm({ ...form, address: { ...form.address, region: e.target.value } })
-          }
+          onChange={(e) => handleAddressChange('region', e.target.value)}
           placeholder="Dhaka Division"
         />
       </Field>
@@ -364,9 +426,7 @@ function StepTwo({
           id="postal-code"
           type="text"
           value={form.address.postalCode || ''}
-          onChange={(e) =>
-            setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
-          }
+          onChange={(e) => handleAddressChange('postalCode', e.target.value)}
           placeholder="1000"
         />
       </Field>
@@ -376,9 +436,7 @@ function StepTwo({
           id="country"
           type="text"
           value={form.address.country}
-          onChange={(e) =>
-            setForm({ ...form, address: { ...form.address, country: e.target.value } })
-          }
+          onChange={(e) => handleAddressChange('country', e.target.value)}
         />
       </Field>
 
@@ -409,7 +467,11 @@ function StepThree({
   logoUploading: boolean;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
-  void setForm;
+  // Save draft when currency changes
+  const handleCurrencyChange = (value: BusinessProfile['currency']) => {
+    setForm({ ...form, currency: value });
+    scheduleDraftSave('currency', value);
+  };
 
   return (
     <div className="space-y-6">
@@ -422,9 +484,7 @@ function StepThree({
         <Select
           id="currency"
           value={form.currency}
-          onChange={(e) =>
-            setForm({ ...form, currency: e.target.value as BusinessProfile['currency'] })
-          }
+          onChange={(e) => handleCurrencyChange(e.target.value as BusinessProfile['currency'])}
         >
           <option value="BDT">BDT - Bangladeshi Taka</option>
           <option value="USD">USD - US Dollar</option>
