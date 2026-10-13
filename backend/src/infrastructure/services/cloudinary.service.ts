@@ -13,11 +13,11 @@ export interface CloudinaryUploadResult {
 }
 
 export class CloudinaryService {
-  async uploadImage(buffer: Buffer): Promise<CloudinaryUploadResult> {
+  async uploadImage(buffer: Buffer, businessId?: string): Promise<CloudinaryUploadResult> {
     return new Promise<CloudinaryUploadResult>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
-          folder: 'business-logos',
+          folder: businessId ? `business-logos/${businessId}` : 'business-logos',
           resource_type: 'image',
         },
         (error, result) => {

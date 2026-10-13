@@ -12,18 +12,35 @@ export const AddressSchema = z.object({
 
 export const BusinessProfileSchema = z.object({
   name: z.string().min(1, 'Business name is required'),
-  currency: CurrencyEnum.default('BDT'),
+  currency: CurrencyEnum,
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')),
   address: AddressSchema,
   onboardingComplete: z.boolean().optional(),
 });
 
-export const BusinessProfileUpdateSchema = BusinessProfileSchema.omit({ onboardingComplete: true });
-
-export const DraftSaveSchema = z.object({
-  field: z.enum(['name', 'currency', 'address', 'logoUrl']),
-  value: z.unknown(),
+/**
+ * Partial update for PUT /me. Every field is optional and only the fields
+ * present in the body are written back. No defaults, so an absent currency
+ * does not silently reset the stored value.
+ */
+export const BusinessProfileUpdateSchema = z.object({
+  name: z.string().min(1, 'Business name is required').optional(),
+  currency: CurrencyEnum.optional(),
+  logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')).optional(),
+  address: AddressSchema.optional(),
 });
+
+/**
+ * Draft save. The value is validated per field so an invalid currency or
+ * malformed address is rejected at the boundary instead of being stored
+ * verbatim in the draft.
+ */
+export const DraftSaveSchema = z.discriminatedUnion('field', [
+  z.object({ field: z.literal('name'), value: z.string().min(1) }),
+  z.object({ field: z.literal('currency'), value: CurrencyEnum }),
+  z.object({ field: z.literal('address'), value: AddressSchema }),
+  z.object({ field: z.literal('logoUrl'), value: z.string().url().or(z.literal('')) }),
+]);
 
 export const BusinessResponseSchema = z.object({
   success: z.boolean(),

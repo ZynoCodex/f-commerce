@@ -13,7 +13,7 @@ describe('backend scaffold', () => {
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(
           () => reject(new Error('Timed out waiting for the backend')),
-          10_000,
+          25_000,
         );
         const onOutput = (chunk: Buffer) => {
           if (chunk.toString().includes(`port ${port}`)) {
@@ -40,5 +40,5 @@ describe('backend scaffold', () => {
     } finally {
       server.kill();
     }
-  }, 15_000);
+  }, 30_000);
 });

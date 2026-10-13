@@ -63,8 +63,8 @@ export class BusinessService {
     return updated;
   }
 
-  async uploadLogo(_businessId: string, imageBuffer: Buffer): Promise<{ logoUrl: string }> {
-    const result = await this.cloudinaryService.uploadImage(imageBuffer);
+  async uploadLogo(businessId: string, imageBuffer: Buffer): Promise<{ logoUrl: string }> {
+    const result = await this.cloudinaryService.uploadImage(imageBuffer, businessId);
     return { logoUrl: result.secure_url };
   }
 }

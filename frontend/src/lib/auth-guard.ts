@@ -13,7 +13,7 @@ import { getAuth } from '@/lib/auth-client';
  * @param options.requireAuth - true (default) for protected routes:
  *   unauthenticated visitors are redirected to `/login`.
  *   false for public-only routes (e.g. /login): authenticated visitors
- *   are redirected to `/dashboard`.
+ *   are redirected to `/onboarding`.
  * @returns `ready` — false while a redirect is pending, true once the user
  *   is allowed to see the page. Callers should render a fallback while
  *   `!ready` so React swaps the tree cleanly instead of leaving a null shell.
@@ -32,9 +32,9 @@ export function useRequireAuth(options?: { requireAuth?: boolean }): boolean {
     if (shouldRedirect) {
       // For protected routes, send unauthenticated visitors to the sign-in page.
       // For public-only routes (e.g. /login), forward authenticated users to
-      // their real home — /dashboard — rather than /onboarding so they don't
-      // double-redirect and end up staring at a null shell mid-transition.
-      router.replace(requireAuth ? '/login' : '/dashboard');
+      // /onboarding. The onboarding page itself redirects to /dashboard when
+      // complete, so this is the single entry point after auth.
+      router.replace(requireAuth ? '/login' : '/onboarding');
     }
   }, [requireAuth, router, shouldRedirect]);
 

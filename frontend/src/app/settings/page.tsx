@@ -52,7 +52,7 @@ export default function SettingsPage() {
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.message || 'Failed to load business');
+          throw new Error(data.message || data.error || 'Failed to load business');
         }
         return res.json();
       })
@@ -109,7 +109,7 @@ export default function SettingsPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || 'Failed to save profile');
+        throw new Error(data.message || data.error || 'Failed to save profile');
       }
 
       setSuccess('Profile updated');

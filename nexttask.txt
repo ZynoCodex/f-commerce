@@ -1,1 +1,1 @@
-Backend onboarding fixes complete. Next: run /check verify business onboarding to validate all changes.
+Verification complete. All review fixes confirmed live at runtime. Next: /test business profile and onboarding or mark feature done.

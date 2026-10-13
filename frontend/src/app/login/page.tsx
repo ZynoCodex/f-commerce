@@ -48,8 +48,18 @@ export default function LoginPage() {
       const data = await res.json();
       const token = data.accessToken;
 
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const businessId = payload.memberships[0]?.businessId;
+      // Use businessId from response if available (extracted from JWT by backend)
+      // Fallback to decoding JWT client-side for backward compatibility
+      let businessId = data.businessId;
+      if (!businessId && token?.split('.').length === 3) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          businessId = payload.memberships?.[0]?.businessId;
+        } catch {
+          // Token decode failed, continue without businessId
+        }
+      }
+
       if (!businessId) throw new Error('No business association found');
 
       setAuth({ accessToken: token, businessId });

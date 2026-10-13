@@ -52,13 +52,14 @@ describe('useRequireAuth', () => {
       expect(result.current).toBe(true);
     });
 
-    it('redirects to /dashboard and reports not-ready when a session is present', () => {
+    it('redirects to /onboarding and reports not-ready when a session is present', () => {
       window.localStorage.setItem('accessToken', 'tok');
       window.localStorage.setItem('businessId', 'biz-1');
 
       const { result } = renderHook(() => useRequireAuth({ requireAuth: false }));
 
-      expect(replaceMock).toHaveBeenCalledWith('/dashboard');
+      // /onboarding is the single entry point after auth; it redirects to /dashboard if complete
+      expect(replaceMock).toHaveBeenCalledWith('/onboarding');
       expect(result.current).toBe(false);
     });
   });

@@ -26,6 +26,10 @@ describe('Auth Middleware', () => {
     it('returns 401 if no auth header', () => {
       requireAuth(req as Request, res as Response, next);
       expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Missing or invalid authorization header',
+        message: 'Missing or invalid authorization header',
+      });
     });
 
     it('returns 401 if token is invalid', () => {
@@ -36,6 +40,10 @@ describe('Auth Middleware', () => {
 
       requireAuth(req as Request, res as Response, next);
       expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid or expired token',
+        message: 'Invalid or expired token',
+      });
     });
 
     it('calls next and sets user if token is valid', () => {
@@ -53,6 +61,10 @@ describe('Auth Middleware', () => {
       const middleware = requireBusinessRole(['OWNER']);
       middleware(req as Request, res as Response, next);
       expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Missing x-business-id header',
+        message: 'Missing x-business-id header',
+      });
     });
 
     it('returns 403 if user lacks access to business', () => {
@@ -62,6 +74,10 @@ describe('Auth Middleware', () => {
       const middleware = requireBusinessRole(['OWNER']);
       middleware(req as Request, res as Response, next);
       expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'You do not have access to this business',
+        message: 'You do not have access to this business',
+      });
     });
 
     it('returns 403 if user role is insufficient', () => {
@@ -71,6 +87,10 @@ describe('Auth Middleware', () => {
       const middleware = requireBusinessRole(['OWNER']);
       middleware(req as Request, res as Response, next);
       expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Insufficient permissions',
+        message: 'You do not have permission to perform this action',
+      });
     });
 
     it('sets context and calls next on success', () => {

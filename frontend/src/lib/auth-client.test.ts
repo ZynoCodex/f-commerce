@@ -59,7 +59,7 @@ describe('auth-client', () => {
   });
 
   describe('apiFetch', () => {
-    it('prepends the API base URL to relative paths', async () => {
+    it('passes relative paths through to fetch for the Next.js rewrite to handle', async () => {
       setAuth({ accessToken: 'tok', businessId: 'biz-1' });
       const fetchMock = vi.fn().mockResolvedValue(new Response('ok'));
       vi.stubGlobal('fetch', fetchMock);
@@ -67,7 +67,7 @@ describe('auth-client', () => {
       await apiFetch('/api/business/me', { method: 'GET' });
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:4000/api/business/me',
+        '/api/business/me',
         expect.anything(),
       );
       const init = fetchMock.mock.calls[0][1] as RequestInit;
@@ -83,7 +83,7 @@ describe('auth-client', () => {
       await apiFetch('/api/business/me', { method: 'GET' });
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:4000/api/business/me',
+        '/api/business/me',
         expect.anything(),
       );
       const init = fetchMock.mock.calls[0][1] as RequestInit;

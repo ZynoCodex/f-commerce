@@ -10,13 +10,61 @@ import {
   DraftSaveSchema,
 } from '@f-commerce/contracts';
 import { NotFoundError } from '../../domain/errors.js';
-import { BusinessModel } from '../../infrastructure/database/mongoose/models/Business.js';
-import { runWithContext } from '../../infrastructure/database/mongoose/context.js';
+import { getTenantId, runWithContext } from '../../infrastructure/database/mongoose/context.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+/**
+ * Detect image type by inspecting magic bytes at the start of the buffer.
+ * This is more reliable than trusting the Content-Type header, which is
+ * client-controlled and can be spoofed.
+ *
+ * Returns the detected MIME type or null if the buffer doesn't match a
+ * supported image format.
+ */
+function detectImageType(buffer: Buffer): string | null {
+  // JPEG: starts with FF D8 FF (3 bytes minimum)
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  // PNG: starts with 89 50 4E 47 0D 0A 1A 0A (8 bytes)
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+
+  // GIF: starts with "GIF87a" or "GIF89a" (6 bytes minimum)
+  if (buffer.length >= 6) {
+    const gif = buffer.toString('ascii', 0, 6);
+    if (gif === 'GIF87a' || gif === 'GIF89a') {
+      return 'image/gif';
+    }
+  }
+
+  // WebP: RIFF....WEBP (12 bytes minimum, the 'WEBP' signature is at offset 8)
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+
+  return null;
+}
 
 export const businessRouter = Router();
 
@@ -34,21 +82,41 @@ businessRouter.use((req, res, next) => {
     return;
   }
 
-  const memberships = (req.user as { memberships?: { businessId: string }[] })?.memberships;
-  const membership = memberships?.[0];
+  // Use the x-business-id header (consistent with requireBusinessRole) so that
+  // STAFF users with multiple memberships are evaluated against the business
+  // they are actually targeting, not always memberships[0].
+  const businessId = req.headers['x-business-id'] as string | undefined;
+  if (!businessId) {
+    res.status(400).json({ error: 'Missing x-business-id header', message: 'Missing x-business-id header' });
+    return;
+  }
+
+  const user = req.user as { userId: string; memberships: { businessId: string; role: 'OWNER' | 'STAFF' }[] };
+  const membership = user?.memberships?.find((m) => m.businessId === businessId);
+
+  // Reject callers who are not a member of the business they are targeting.
+  // Without this, a non-member's request would run a DB lookup against a
+  // business they have no relationship with, leaking its existence and
+  // onboarding status via the response code.
   if (!membership) {
-    res.status(400).json({ error: 'No business context', message: 'Missing business context' });
+    res.status(403).json({
+      error: 'Insufficient permissions',
+      message: 'You are not a member of this business',
+    });
     return;
   }
 
   // Run the DB lookup inside the tenant context so the query is isolated
+  // even if the Business model later adopts the tenant plugin.
   runWithContext(
-    { userId: (req.user as { userId: string }).userId, businessId: membership.businessId },
+    {
+      userId: user.userId,
+      businessId,
+      role: membership.role,
+    },
     async () => {
       try {
-        const business = await BusinessModel.findById(membership.businessId)
-          .select('onboardingComplete')
-          .lean();
+        const business = await businessService.getBusiness(businessId);
         if (!business || !business.onboardingComplete) {
           res.status(403).json({
             error: 'Onboarding required',
@@ -71,8 +139,8 @@ businessRouter.get(
   requireBusinessRole(['OWNER', 'STAFF']),
   async (req: Request, res: Response) => {
     try {
-      const businessId = (req.user as { memberships: { businessId: string }[] }).memberships[0]
-        ?.businessId;
+      // Use tenant context businessId set by requireBusinessRole middleware
+      const businessId = getTenantId();
       if (!businessId) {
         res.status(400).json({ error: 'No business context', message: 'Missing business context' });
         return;
@@ -110,8 +178,8 @@ businessRouter.put('/me', requireBusinessRole(['OWNER']), async (req: Request, r
       return;
     }
 
-    const businessId = (req.user as { memberships: { businessId: string }[] }).memberships[0]
-      ?.businessId;
+    // Use tenant context businessId set by requireBusinessRole middleware
+    const businessId = getTenantId();
     if (!businessId) {
       res.status(400).json({ error: 'No business context', message: 'Missing business context' });
       return;
@@ -154,31 +222,32 @@ businessRouter.post(
         return;
       }
 
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(req.file.mimetype)) {
-        res
-          .status(400)
-          .json({
-            error: 'Invalid file type',
-            message: 'Only JPEG, PNG, GIF, and WebP images are allowed',
-          });
-        return;
-      }
-
       const maxSize = 5 * 1024 * 1024;
       if (req.file.size > maxSize) {
         res.status(400).json({ error: 'File too large', message: 'Maximum file size is 5MB' });
         return;
       }
 
-      const businessId = (req.user as { memberships: { businessId: string }[] }).memberships[0]
-        ?.businessId;
+      // Validate file by magic bytes (MIME type from header is attacker-controlled)
+      const detectedType = detectImageType(req.file.buffer);
+      if (!detectedType) {
+        res.status(400).json({
+          error: 'Invalid file type',
+          message: 'Only JPEG, PNG, GIF, and WebP images are allowed',
+        });
+        return;
+      }
+
+      // Use tenant context businessId set by requireBusinessRole middleware
+      const businessId = getTenantId();
       if (!businessId) {
         res.status(400).json({ error: 'No business context', message: 'Missing business context' });
         return;
       }
 
       const result = await businessService.uploadLogo(businessId, req.file.buffer);
+      // Persist the logo URL to the business so it's available during onboarding
+      await businessService.updateBusiness(businessId, { logoUrl: result.logoUrl });
       res.status(200).json({
         success: true,
         data: { logoUrl: result.logoUrl },
@@ -202,8 +271,8 @@ businessRouter.put(
         return;
       }
 
-      const businessId = (req.user as { memberships: { businessId: string }[] }).memberships[0]
-        ?.businessId;
+      // Use tenant context businessId set by requireBusinessRole middleware
+      const businessId = getTenantId();
       if (!businessId) {
         res.status(400).json({ error: 'No business context', message: 'Missing business context' });
         return;
@@ -255,8 +324,8 @@ businessRouter.put(
       }
 
       const { field, value } = parsed.data;
-      const businessId = (req.user as { memberships: { businessId: string }[] }).memberships[0]
-        ?.businessId;
+      // Use tenant context businessId set by requireBusinessRole middleware
+      const businessId = getTenantId();
       if (!businessId) {
         res.status(400).json({ error: 'No business context', message: 'Missing business context' });
         return;

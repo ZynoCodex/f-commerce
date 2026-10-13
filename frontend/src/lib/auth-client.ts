@@ -1,6 +1,5 @@
 const TOKEN_KEY = 'accessToken';
 const BUSINESS_ID_KEY = 'businessId';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export interface AuthUser {
   accessToken: string;
@@ -39,11 +38,8 @@ export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<
   Object.entries(authHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
-  // Use full URL so client-side fetch bypasses Next.js rewrites (which only
-  // work server-side) and hits the Express backend directly.
-  const url =
-    typeof input === 'string' && input.startsWith('/')
-      ? new URL(input, API_BASE_URL).toString()
-      : input;
-  return fetch(url, { ...init, headers });
+  // Pass relative paths through directly. Next.js rewrites in next.config.ts
+  // forward /api/* to the Express backend, which works in both dev and
+  // production. No hardcoded host means this works in any deployment.
+  return fetch(input, { ...init, headers });
 }

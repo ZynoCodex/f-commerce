@@ -49,7 +49,29 @@ describe('Auth Controller', () => {
       });
 
       expect(res.status).toBe(201);
-      expect(res.body).toEqual({ accessToken: 'access' });
+      expect(res.body).toEqual({ accessToken: 'access', businessId: undefined });
+      expect(res.header['set-cookie'][0]).toContain('refreshToken=refresh');
+    });
+
+    it('returns 201 with businessId extracted from token', async () => {
+      // Create a valid JWT payload with businessId: biz-1
+      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const fullToken = `access.${payload}.signature`;
+      vi.mocked(AuthService.prototype.register).mockResolvedValueOnce({
+        accessToken: fullToken,
+        refreshToken: 'refresh',
+      });
+
+      const res = await request(app).post('/api/auth/register').send({
+        email: 'test@test.com',
+        password: 'password123',
+        name: 'Test User',
+        businessName: 'Test Business',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.accessToken).toBe(fullToken);
+      expect(res.body.businessId).toBe('biz-1');
       expect(res.header['set-cookie'][0]).toContain('refreshToken=refresh');
     });
 
@@ -70,9 +92,12 @@ describe('Auth Controller', () => {
   });
 
   describe('POST /api/auth/login', () => {
-    it('returns 200 on success', async () => {
+    it('returns 200 on success with businessId extracted from token', async () => {
+      // Create a valid JWT payload with businessId: biz-1
+      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const fullToken = `access.${payload}.signature`;
       vi.mocked(AuthService.prototype.login).mockResolvedValueOnce({
-        accessToken: 'access',
+        accessToken: fullToken,
         refreshToken: 'refresh',
       });
 
@@ -81,7 +106,8 @@ describe('Auth Controller', () => {
         .send({ email: 't@t.com', password: 'p' });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ accessToken: 'access' });
+      expect(res.body.accessToken).toBe(fullToken);
+      expect(res.body.businessId).toBe('biz-1');
     });
 
     it('returns 401 on invalid credentials', async () => {
@@ -98,9 +124,12 @@ describe('Auth Controller', () => {
   });
 
   describe('POST /api/auth/oauth/:provider', () => {
-    it('returns 200 on OAuth success', async () => {
+    it('returns 200 on OAuth success with businessId extracted from token', async () => {
+      // Create a valid JWT payload with businessId: biz-1
+      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const fullToken = `oauth_access.${payload}.signature`;
       vi.mocked(AuthService.prototype.oauthLogin).mockResolvedValueOnce({
-        accessToken: 'oauth_access',
+        accessToken: fullToken,
         refreshToken: 'oauth_refresh',
       });
 
@@ -109,7 +138,8 @@ describe('Auth Controller', () => {
         .send({ email: 't@google.com', name: 'Test', providerId: 'google123' });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ accessToken: 'oauth_access' });
+      expect(res.body.accessToken).toBe(fullToken);
+      expect(res.body.businessId).toBe('biz-1');
       expect(res.header['set-cookie'][0]).toContain('refreshToken=oauth_refresh');
     });
 

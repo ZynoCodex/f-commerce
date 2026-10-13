@@ -227,7 +227,7 @@ describe('BusinessService', () => {
 
       const result = await businessService.uploadLogo('biz1', buffer);
 
-      expect(mockCloudinaryService.uploadImage).toHaveBeenCalledWith(buffer);
+      expect(mockCloudinaryService.uploadImage).toHaveBeenCalledWith(buffer, 'biz1');
       expect(result.logoUrl).toBe(
         'https://res.cloudinary.com/demo/image/upload/v123/business-logos/abc.png',
       );
@@ -238,6 +238,20 @@ describe('BusinessService', () => {
       mockCloudinaryService.uploadImage.mockRejectedValueOnce(new Error('Upload failed'));
 
       await expect(businessService.uploadLogo('biz1', buffer)).rejects.toThrow('Upload failed');
+    });
+
+    it('permits updating logo URL independently via updateBusiness', async () => {
+      // This test verifies the fix for: Logo upload URL is never persisted
+      // After uploadLogo returns a URL, updateBusiness should save it to the business
+      const logoUrl = 'https://res.cloudinary.com/demo/image/upload/v123/business-logos/new-logo.png';
+      const updatedBusiness = makeBusiness({ logoUrl });
+
+      mockBusinessRepository.updateProfile.mockResolvedValueOnce(updatedBusiness);
+
+      const result = await businessService.updateBusiness('biz1', { logoUrl });
+
+      expect(mockBusinessRepository.updateProfile).toHaveBeenCalledWith('biz1', { logoUrl });
+      expect(result?.logoUrl).toBe(logoUrl);
     });
   });
 });
