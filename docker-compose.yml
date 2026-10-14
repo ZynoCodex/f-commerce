@@ -1,6 +1,9 @@
 services:
   mongo:
     image: mongo:8.0
+    # Replica set mode (single node) so multi document transactions are
+    # available in local development, matching production.
+    command: ['--replSet', 'rs0', '--bind_ip_all']
     environment:
       MONGO_INITDB_ROOT_USERNAME: fcommerce
       MONGO_INITDB_ROOT_PASSWORD: fcommerce
@@ -14,6 +17,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: 'no'
+    # Initiate the single node replica set. Safe to re-run: an already
+    # initiated set returns an error that this script ignores.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        mongosh --host mongo:27017 -u fcommerce -p fcommerce --authenticationDatabase admin --quiet --eval '
+          try {
+            rs.status();
+          } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] });
+          }
+        '
 
   redis:
     image: redis:7.4

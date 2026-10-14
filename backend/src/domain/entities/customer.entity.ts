@@ -6,4 +6,6 @@ export interface Customer extends TenantEntity {
   email?: string;
   address?: string;
   notes?: string;
+  archivedAt?: Date;
+  version: number;
 }

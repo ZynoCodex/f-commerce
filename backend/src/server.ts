@@ -5,6 +5,7 @@ import { config } from './infrastructure/config.js';
 import { connectToDatabase } from './infrastructure/database/mongoose/connection.js';
 import { authRouter } from './presentation/controllers/auth.controller.js';
 import { businessRouter } from './presentation/controllers/business.controller.js';
+import { customerRouter } from './presentation/controllers/customer.controller.js';
 
 const app = express();
 const port = Number(config.PORT);
@@ -21,6 +22,7 @@ app.use(cookieParser());
 
 app.use('/api/auth', authRouter);
 app.use('/api/business', businessRouter);
+app.use('/api/customers', customerRouter);
 
 app.get('/health', (_request, response) => {
   response.status(200).json({

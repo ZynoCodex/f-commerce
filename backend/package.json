@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pretest": "npm run build --workspace @f-commerce/contracts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backfill:customers": "tsx src/scripts/backfill-customer-version.ts"
   },
   "dependencies": {
     "@f-commerce/contracts": "*",
