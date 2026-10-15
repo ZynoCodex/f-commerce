@@ -20,7 +20,7 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 ## Commands
 
 - [ ] `npm run typecheck --workspace @f-commerce/backend && npm run typecheck --workspace @f-commerce/frontend` → both clean → AC-1 (build gate)
-- [ ] `MONGOMS_SYSTEM_BINARY=node_modules/.cache/mongodb-memory-server/mongod-x64-win32-8.2.6.exe npm run test --workspace @f-commerce/backend` → 245 tests across 17 files pass, including the 19 repository integration tests → AC-4, AC-5, AC-7, AC-10
+- [ ] `npm run test --workspace @f-commerce/backend` → 245 tests across 17 files pass, including the 19 repository integration tests → AC-4, AC-5, AC-7, AC-10
 - [ ] `npm run test --workspace @f-commerce/frontend` → 55 tests across 7 files pass → AC-1 (build gate)
 - [ ] `npm run e2e --workspace @f-commerce/frontend` → 18 tests pass (3 customer tests on desktop and mobile) → AC-1, AC-3, AC-4, AC-5, AC-6, AC-8
 - [ ] `npm run lint --workspace @f-commerce/backend && npm run lint --workspace @f-commerce/frontend` → no errors → AC-1 (build gate)
@@ -42,7 +42,8 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 
 ## Not yet covered
 
-- Client timeout recovery: covered by the new e2e test `an archive that times out reloads the customer instead of assuming failure`, on desktop and mobile → AC-8
-- `PHONE_IN_USE` restore branch: the spec says to test it with a stubbed repository, because the unique index prevents the state in the database. Still open.
-- Index plan: the explain assertions run in `customer.repository.integration.test.ts`, but they need the mongod binary set to run in CI → AC-5, AC-7
+- Client timeout recovery: covered by the e2e test `an archive that times out reloads the customer instead of assuming failure`, on desktop and mobile → AC-8
+- `PHONE_IN_USE` restore branch: covered by `customer.service.test.ts`, which stubs the repository as the spec asks, because the unique index prevents the state in the database → AC-9
+- Index plan: the explain assertions in `customer.repository.integration.test.ts` now run without any environment variable, because `mongo-replset.ts` finds the cached mongod itself → AC-5, AC-7
+- At the route level, a concurrent create race is open: the concurrent archive race is covered in the repository tests, and two creates racing to claim one phone are only covered there too → AC-3
 - Atlas index creation and the `version` backfill have not been run against a real target database.
