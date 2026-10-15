@@ -127,9 +127,7 @@ describe('LoginPage', () => {
   });
 
   it('shows an error when the response has no business association', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, { accessToken: 'not-a-jwt' }));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { accessToken: 'not-a-jwt' }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -147,13 +145,9 @@ describe('LoginPage', () => {
   });
 
   it('falls back to decoding the JWT when businessId is missing from the response', async () => {
-    const payload = btoa(
-      JSON.stringify({ memberships: [{ businessId: 'biz-from-jwt' }] }),
-    );
+    const payload = btoa(JSON.stringify({ memberships: [{ businessId: 'biz-from-jwt' }] }));
     const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, { accessToken: fakeJwt }));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { accessToken: fakeJwt }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 

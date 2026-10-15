@@ -20,7 +20,7 @@ This branch implements business profile onboarding (spec 0004): a business profi
 
 ### 🔴 Draft-save endpoint accepts arbitrary field names with no whitelist, `backend/src/presentation/controllers/business.controller.ts:214-233`
 
-**Problem**: The `PUT /onboarding/draft` endpoint accepts any string `field` value from the request body and passes it to `saveDraft`, which constructs a MongoDB update path via `update[`onboardingDraft.${field}`] = value`. There is no validation that `field` is one of `name`, `currency`, `address`, or `logoUrl`. An attacker can send `field: "$where"` or `field: "isAdmin"` or any arbitrary dotted path.
+**Problem**: The `PUT /onboarding/draft` endpoint accepts any string `field` value from the request body and passes it to `saveDraft`, which constructs a MongoDB update path via `update[`onboardingDraft.${field}`] = value`. There is no validation that `field` is one of `name`, `currency`, `address`, or `logoUrl`. An attacker can send `field: "$where"`or`field: "isAdmin"` or any arbitrary dotted path.
 
 **Why it matters**: While Mongoose's `$set` operator with string keys does not directly allow operator injection (`$set` treats the key as a literal field name), the lack of input validation is a correctness and maintainability hazard. More critically, the `field` value is used to construct a dynamic object key — if the frontend ever changes to use `updateOne({ $set: { ... } })` with user-controlled keys, it becomes a direct NoSQL injection vector. Even now, sending `field: "currency"` with a non-enum value like `field: "XYZ"` stores garbage data that bypasses the Zod enum validation applied elsewhere.
 
@@ -58,7 +58,7 @@ This branch implements business profile onboarding (spec 0004): a business profi
 
 **Why it matters**: This dead conditional suggests either a leftover from a different approach or an intended difference that was never implemented. It's confusing and could mask intended behavior (e.g., if `logoUrl` was meant to be set at the top-level `logoUrl` field, not the draft).
 
-**Suggested fix**: Remove the `if/else` branch; `update[\`onboardingDraft.${field}\`] = value` handles all fields uniformly. If `logoUrl` truly needs different handling (setting top-level instead of draft), document and implement that.
+**Suggested fix**: Remove the `if/else` branch; `update[\`onboardingDraft.${field}\`] = value`handles all fields uniformly. If`logoUrl` truly needs different handling (setting top-level instead of draft), document and implement that.
 
 ## Minor
 
