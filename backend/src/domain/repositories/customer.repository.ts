@@ -66,7 +66,10 @@ export interface ICustomerRepository {
   ): Promise<Customer | null>;
   search(query: CustomerSearchQuery): Promise<CustomerSearchResult>;
   listOrders(query: CustomerOrderQuery): Promise<CustomerOrderResult>;
-  aggregateSpend(customerId: string, excludedStatuses: OrderStatus[]): Promise<CustomerSpendSummary>;
+  aggregateSpend(
+    customerId: string,
+    excludedStatuses: OrderStatus[],
+  ): Promise<CustomerSpendSummary>;
   archiveWithAudit(
     id: string,
     expectedVersion: number,

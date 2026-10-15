@@ -10,9 +10,13 @@ import { CustomerModel } from '../infrastructure/database/mongoose/models/Custom
 async function backfillCustomerVersions(): Promise<void> {
   await mongoose.connect(config.MONGODB_URI);
 
-  const result = await CustomerModel.updateMany({ version: { $exists: false } }, { $set: { version: 1 } }, {
-    bypassTenantIsolation: true,
-  } as Parameters<typeof CustomerModel.updateMany>[2]);
+  const result = await CustomerModel.updateMany(
+    { version: { $exists: false } },
+    { $set: { version: 1 } },
+    {
+      bypassTenantIsolation: true,
+    } as Parameters<typeof CustomerModel.updateMany>[2],
+  );
 
   console.log(`Backfilled version on ${result.modifiedCount} customer document(s).`);
 

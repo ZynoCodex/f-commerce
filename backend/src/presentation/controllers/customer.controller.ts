@@ -116,20 +116,24 @@ function paramId(req: Request): string {
 
 customerRouter.use(requireAuth);
 
-customerRouter.post('/', requireBusinessRole(ALLOWED_ROLES), async (req: Request, res: Response) => {
-  try {
-    const parsed = CustomerCreateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new ValidationError(invalidFields(parsed.error.issues));
-    }
+customerRouter.post(
+  '/',
+  requireBusinessRole(ALLOWED_ROLES),
+  async (req: Request, res: Response) => {
+    try {
+      const parsed = CustomerCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new ValidationError(invalidFields(parsed.error.issues));
+      }
 
-    const actor = { ...actorFromContext(), userId: actingUserId(req) };
-    const created = await customerService.create(parsed.data, actor);
-    res.status(201).json({ success: true, data: created, message: 'Customer created' });
-  } catch (error) {
-    sendError(res, error);
-  }
-});
+      const actor = { ...actorFromContext(), userId: actingUserId(req) };
+      const created = await customerService.create(parsed.data, actor);
+      res.status(201).json({ success: true, data: created, message: 'Customer created' });
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
 
 customerRouter.get('/', requireBusinessRole(ALLOWED_ROLES), async (req: Request, res: Response) => {
   try {

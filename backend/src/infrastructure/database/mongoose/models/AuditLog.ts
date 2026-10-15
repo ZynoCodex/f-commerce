@@ -28,6 +28,7 @@ const AuditLogSchema = new Schema<AuditLogDocument>(
 AuditLogSchema.plugin(tenantPlugin);
 
 // Indexes for searching audit logs by entity or user
+AuditLogSchema.index({ businessId: 1, entityType: 1, entityId: 1 });
 AuditLogSchema.index({ businessId: 1, entityType: 1, entityId: 1, createdAt: -1 });
 AuditLogSchema.index({ businessId: 1, userId: 1 });
 AuditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 31536000 }); // 365 days retention

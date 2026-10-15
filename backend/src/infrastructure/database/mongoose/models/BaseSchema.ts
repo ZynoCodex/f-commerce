@@ -10,9 +10,9 @@ export const tenantSchemaOptions = {
   ...baseSchemaOptions,
 };
 
-type Next = (error?: Error) => void;
-
-// Reusable plugin to ensure businessId is indexed and isolated
+// Reusable plugin to ensure businessId is indexed and isolated.
+// Mongoose 9 runs pre hooks as async functions without a `next` callback,
+// so each hook throws to abort and returns to continue.
 export function tenantPlugin(schema: Schema) {
   schema.add({ businessId: { type: Schema.Types.ObjectId, required: true, index: true } });
 
@@ -33,15 +33,15 @@ export function tenantPlugin(schema: Schema) {
 
   types.forEach((type) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    schema.pre(type as any, function (this: Record<string, unknown>, next: Next) {
+    schema.pre(type as any, function (this: Record<string, unknown>) {
       if ((this.options as Record<string, unknown>)?.bypassTenantIsolation) {
-        return next();
+        return;
       }
 
       const tenantId = getTenantId();
 
       if (!tenantId) {
-        return next(new Error('Tenant isolation failed: no businessId found in context'));
+        throw new Error('Tenant isolation failed: no businessId found in context');
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,38 +51,33 @@ export function tenantPlugin(schema: Schema) {
       const update = (this as any).getUpdate?.();
       if (update) {
         if (update.businessId || update.$set?.businessId) {
-          return next(
-            new Error('Tenant isolation failed: cannot mutate businessId in update operation'),
-          );
+          throw new Error('Tenant isolation failed: cannot mutate businessId in update operation');
         }
       }
-
-      next();
     });
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema.pre('aggregate' as any, function (this: any, next: Next) {
+  schema.pre('aggregate' as any, function (this: any) {
     if (this.options?.bypassTenantIsolation) {
-      return next();
+      return;
     }
     const tenantId = getTenantId();
     if (!tenantId) {
-      return next(new Error('Tenant isolation failed: no businessId found in context'));
+      throw new Error('Tenant isolation failed: no businessId found in context');
     }
     this.pipeline().unshift({ $match: { businessId: new mongoose.Types.ObjectId(tenantId) } });
-    next();
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema.pre('save' as any, function (this: Record<string, unknown>, next: Next) {
+  schema.pre('save' as any, function (this: Record<string, unknown>) {
     if ((this.$locals as Record<string, unknown>)?.bypassTenantIsolation) {
-      return next();
+      return;
     }
 
     const tenantId = getTenantId();
     if (!tenantId) {
-      return next(new Error('Tenant isolation failed: no businessId found in context on save'));
+      throw new Error('Tenant isolation failed: no businessId found in context on save');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,14 +85,12 @@ export function tenantPlugin(schema: Schema) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const businessId = (this as any).businessId;
       if (businessId && businessId.toString() !== tenantId.toString()) {
-        return next(
-          new Error('Tenant isolation failed: trying to save document for different businessId'),
+        throw new Error(
+          'Tenant isolation failed: trying to save document for different businessId',
         );
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this as any).businessId = tenantId;
     }
-
-    next();
   });
 }

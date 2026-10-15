@@ -75,7 +75,11 @@ const editOptionalEmail = z
   });
 
 export const CustomerCreateSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(120, 'Name must be 120 characters or fewer'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(120, 'Name must be 120 characters or fewer'),
   phone: z.string(),
   email: createOptionalEmail,
   address: createOptionalText,

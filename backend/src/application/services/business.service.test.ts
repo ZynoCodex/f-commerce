@@ -118,7 +118,11 @@ describe('BusinessService', () => {
 
       await businessService.saveDraft('biz1', 'address', addressDraft);
 
-      expect(mockBusinessRepository.saveDraft).toHaveBeenCalledWith('biz1', 'address', addressDraft);
+      expect(mockBusinessRepository.saveDraft).toHaveBeenCalledWith(
+        'biz1',
+        'address',
+        addressDraft,
+      );
     });
   });
 
@@ -243,7 +247,8 @@ describe('BusinessService', () => {
     it('permits updating logo URL independently via updateBusiness', async () => {
       // This test verifies the fix for: Logo upload URL is never persisted
       // After uploadLogo returns a URL, updateBusiness should save it to the business
-      const logoUrl = 'https://res.cloudinary.com/demo/image/upload/v123/business-logos/new-logo.png';
+      const logoUrl =
+        'https://res.cloudinary.com/demo/image/upload/v123/business-logos/new-logo.png';
       const updatedBusiness = makeBusiness({ logoUrl });
 
       mockBusinessRepository.updateProfile.mockResolvedValueOnce(updatedBusiness);

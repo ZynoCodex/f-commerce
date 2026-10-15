@@ -169,7 +169,12 @@ export class CustomerService {
     }
 
     try {
-      const updated = await this.repository.update(id, customer.version, changes, customer.version + 1);
+      const updated = await this.repository.update(
+        id,
+        customer.version,
+        changes,
+        customer.version + 1,
+      );
       if (!updated) {
         throw new CustomerChangedError();
       }

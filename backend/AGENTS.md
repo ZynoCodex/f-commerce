@@ -6,13 +6,13 @@ The backend is the Express API workspace. It currently exposes the health endpoi
 
 ## Key files
 
-| File                 | Owns                                         |
-| -------------------- | -------------------------------------------- |
-| `src/server.ts`      | Express app setup, `/health`, `/api/auth`    |
-| `src/server.test.ts` | Health smoke test without MongoDB or Redis   |
+| File                                                        | Owns                                               |
+| ----------------------------------------------------------- | -------------------------------------------------- |
+| `src/server.ts`                                             | Express app setup, `/health`, `/api/auth`          |
+| `src/server.test.ts`                                        | Health smoke test without MongoDB or Redis         |
 | `src/infrastructure/database/mongoose/models/BaseSchema.ts` | Global Mongoose plugin for strict tenant isolation |
-| `src/application/services/auth.service.ts` | Core authentication and tenant logic (Clean Arch) |
-| `package.json`       | Backend scripts and dependencies             |
+| `src/application/services/auth.service.ts`                  | Core authentication and tenant logic (Clean Arch)  |
+| `package.json`                                              | Backend scripts and dependencies                   |
 
 ## Commands
 

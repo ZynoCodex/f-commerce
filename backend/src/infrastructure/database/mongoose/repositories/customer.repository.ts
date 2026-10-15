@@ -95,6 +95,7 @@ export class MongooseCustomerRepository implements ICustomerRepository {
 
   async insert(data: Customer): Promise<Customer> {
     const doc = await CustomerModel.create({
+      businessId: objectId(data.businessId),
       name: data.name,
       phone: data.phone,
       email: data.email,
@@ -141,9 +142,9 @@ export class MongooseCustomerRepository implements ICustomerRepository {
 
     const or: Record<string, unknown>[] = [];
     if (query.nameQuery !== '') {
-      // Case insensitivity comes from the index collation, so the pattern stays
-      // anchored and the index remains usable.
-      or.push({ name: { $regex: `^${escapeRegex(query.nameQuery)}` } });
+      // A collation range is case-insensitive and stays on the name index;
+      // $regex ignores collation and forces a scan of the business's records.
+      or.push({ name: { $gte: query.nameQuery, $lt: `${query.nameQuery}￿` } });
     }
     if (query.phonePrefix !== null) {
       or.push({ phone: { $regex: `^${escapeRegex(query.phonePrefix)}` } });
