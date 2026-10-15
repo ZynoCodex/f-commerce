@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 4   | Design system & UI foundation     | Foundation | done        |
 | 5   | Authentication & tenant isolation | Slice 1    | done        |
 | 6   | Business profile & onboarding     | Slice 1    | done        |
-| 7   | Customers                         | Slice 1    | done        |
+| 7   | Customers                         | Slice 1    | in-progress |
 | 8   | Products & categories             | Slice 2    | planned     |
 | 9   | Orders (CRUD + status workflow)   | Slice 2    | planned     |
 | 10  | Payments                          | Slice 2    | planned     |
@@ -118,7 +118,7 @@ Registration flow creates business account, collects business info (name, logo, 
 - [x] Review it (fresh model): `/check review business onboarding`
       Findings [2026-09-24-feat-business-backend](https://github.com/review) — 3 blockers, 3 major, 6 minor, 6 nits. Verified by claude-sonnet-4-6. All 3 blockers addressed in commit 9196280: (1) onboarding gate now runs inside `runWithContext` with proper error handling, (2) `DraftSaveSchema` Zod validation added for field whitelist, (3) `onboarding.middleware.ts` deleted.
 
-### 7. Customers · done
+### 7. Customers · in-progress
 
 Customer CRUD, search/filter, order history and spending view, clickable phone on mobile.
 **Done when:** user can create/edit/search customers and see customer profile with order history.
@@ -131,7 +131,7 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
   - [x] Search, profile totals, order history, cursors, and tenant access (AC-5, AC-6, AC-7, AC-11, AC-12)
   - [x] Customer screens for search, create, edit, profile, archive, restore, and timeout recovery (AC-1, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-12)
         Code in `backend/src/application/services/customer.service.ts`, `backend/src/presentation/controllers/customer.controller.ts`, `frontend/src/app/customers/`
-- [x] Verify it: `/check verify customers` — 2026-10-15: full stack exercised against a real replica set; typecheck clean, backend 245/245, frontend 55/55, e2e 18/18 desktop and mobile; profile, search, duplicate block, archive, restore, and timeout recovery all driven in the browser. Atlas index creation and the `version` backfill still owe a real target database.
+- [ ] Verify it: `/check verify customers` — not yet run. Evidence gathered 2026-10-15 against a real replica set: typecheck clean, backend 245/245, frontend 55/55, e2e 18/18 desktop and mobile; profile, search, duplicate block, archive, restore, and timeout recovery driven in the browser. Atlas index creation and the `version` backfill still owe a real target database.
 - [ ] Test it: `/test customers`
 - [ ] Review it (fresh model): `/check review customers`
 - [ ] Document it: `/document customers`
