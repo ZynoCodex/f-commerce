@@ -10,26 +10,26 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## At a glance
 
-| #   | Feature                           | Phase      | Status      |
-| --- | --------------------------------- | ---------- | ----------- |
-| 1   | Stack & architecture              | Foundation | done        |
-| 2   | Data model                        | Foundation | done        |
-| 3   | Coding standards & tooling        | Foundation | done        |
-| 4   | Design system & UI foundation     | Foundation | done        |
-| 5   | Authentication & tenant isolation | Slice 1    | done        |
-| 6   | Business profile & onboarding     | Slice 1    | done        |
-| 7   | Customers                         | Slice 1    | in-progress |
-| 8   | Products & categories             | Slice 2    | planned     |
-| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned     |
-| 10  | Payments                          | Slice 2    | planned     |
-| 11  | Inventory management              | Slice 3    | planned     |
-| 12  | Delivery & shipping               | Slice 3    | planned     |
-| 13  | Expenses & profit calculation     | Slice 3    | planned     |
-| 14  | Dashboard                         | Slice 3    | planned     |
-| 15  | Reports                           | Slice 4    | planned     |
-| 16  | Search & filters                  | Slice 4    | planned     |
-| 17  | Notifications                     | Slice 4    | planned     |
-| 18  | Invoice generation                | Slice 4    | planned     |
+| #   | Feature                           | Phase      | Status  |
+| --- | --------------------------------- | ---------- | ------- |
+| 1   | Stack & architecture              | Foundation | done    |
+| 2   | Data model                        | Foundation | done    |
+| 3   | Coding standards & tooling        | Foundation | done    |
+| 4   | Design system & UI foundation     | Foundation | done    |
+| 5   | Authentication & tenant isolation | Slice 1    | done    |
+| 6   | Business profile & onboarding     | Slice 1    | done    |
+| 7   | Customers                         | Slice 1    | done    |
+| 8   | Products & categories             | Slice 2    | planned |
+| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned |
+| 10  | Payments                          | Slice 2    | planned |
+| 11  | Inventory management              | Slice 3    | planned |
+| 12  | Delivery & shipping               | Slice 3    | planned |
+| 13  | Expenses & profit calculation     | Slice 3    | planned |
+| 14  | Dashboard                         | Slice 3    | planned |
+| 15  | Reports                           | Slice 4    | planned |
+| 16  | Search & filters                  | Slice 4    | planned |
+| 17  | Notifications                     | Slice 4    | planned |
+| 18  | Invoice generation                | Slice 4    | planned |
 
 ## Foundations
 
