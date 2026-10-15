@@ -1,6 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiFetch, clearAuth, getAuth, getAuthHeaders, setAuth } from '@/lib/auth-client';
+import {
+  apiFetch,
+  clearAuth,
+  getAuth,
+  getAuthHeaders,
+  isTimeoutError,
+  setAuth,
+} from '@/lib/auth-client';
 
 const TOKEN_KEY = 'accessToken';
 const BUSINESS_ID_KEY = 'businessId';
@@ -66,10 +73,7 @@ describe('auth-client', () => {
 
       await apiFetch('/api/business/me', { method: 'GET' });
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/business/me',
-        expect.anything(),
-      );
+      expect(fetchMock).toHaveBeenCalledWith('/api/business/me', expect.anything());
       const init = fetchMock.mock.calls[0][1] as RequestInit;
       const headers = init.headers as Headers;
       expect(headers.get('Authorization')).toBe('Bearer tok');
@@ -82,10 +86,7 @@ describe('auth-client', () => {
 
       await apiFetch('/api/business/me', { method: 'GET' });
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/business/me',
-        expect.anything(),
-      );
+      expect(fetchMock).toHaveBeenCalledWith('/api/business/me', expect.anything());
       const init = fetchMock.mock.calls[0][1] as RequestInit;
       const headers = init.headers as Headers;
       expect(headers.get('Authorization')).toBeNull();
@@ -124,6 +125,44 @@ describe('auth-client', () => {
       await apiFetch('https://example.com/path');
 
       expect(fetchMock).toHaveBeenCalledWith('https://example.com/path', expect.anything());
+    });
+  });
+
+  describe('request timeout', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('aborts the request after the timeout window', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn(
+        (_input: RequestInfo, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const pending = apiFetch('/api/business/me');
+      const rejection = expect(pending).rejects.toSatisfy(isTimeoutError);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await rejection;
+    });
+
+    it('clears the timeout once a request settles', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok')));
+
+      await apiFetch('/api/business/me');
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('recognises only timeout errors', () => {
+      expect(isTimeoutError(new DOMException('late', 'TimeoutError'))).toBe(true);
+      expect(isTimeoutError(new DOMException('cancelled', 'AbortError'))).toBe(false);
+      expect(isTimeoutError(new Error('network down'))).toBe(false);
     });
   });
 

@@ -373,7 +373,12 @@ export default function CustomersPage() {
               Previous
             </Button>
             <span className="font-mono text-sm text-muted">Page {pageNumber}</span>
-            <Button disabled={!page.nextCursor} onClick={goToNext} type="button" variant="secondary">
+            <Button
+              disabled={!page.nextCursor}
+              onClick={goToNext}
+              type="button"
+              variant="secondary"
+            >
               Next
             </Button>
           </nav>

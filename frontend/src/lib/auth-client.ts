@@ -32,14 +32,36 @@ export function getAuthHeaders(): Record<string, string> {
   };
 }
 
+/** Every request gives up after this long. A timed out request is never retried. */
+export const REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * True when a rejected fetch came from our timeout rather than the network.
+ * A caller uses this to reload and reconcile instead of assuming failure.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'TimeoutError';
+}
+
 export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const authHeaders = getAuthHeaders();
   Object.entries(authHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
-  // Pass relative paths through directly. Next.js rewrites in next.config.ts
-  // forward /api/* to the Express backend, which works in both dev and
-  // production. No hardcoded host means this works in any deployment.
-  return fetch(input, { ...init, headers });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+    REQUEST_TIMEOUT_MS,
+  );
+
+  try {
+    // Pass relative paths through directly. Next.js rewrites in next.config.ts
+    // forward /api/* to the Express backend, which works in both dev and
+    // production. No hardcoded host means this works in any deployment.
+    return await fetch(input, { ...init, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }

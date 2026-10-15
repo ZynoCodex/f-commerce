@@ -10,26 +10,26 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## At a glance
 
-| #   | Feature                           | Phase      | Status  |
-| --- | --------------------------------- | ---------- | ------- |
-| 1   | Stack & architecture              | Foundation | done    |
-| 2   | Data model                        | Foundation | done    |
-| 3   | Coding standards & tooling        | Foundation | done    |
-| 4   | Design system & UI foundation     | Foundation | done    |
-| 5   | Authentication & tenant isolation | Slice 1    | done    |
-| 6   | Business profile & onboarding     | Slice 1    | done    |
-| 7   | Customers                         | Slice 1    | in-progress (designed) |
-| 8   | Products & categories             | Slice 2    | planned |
-| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned |
-| 10  | Payments                          | Slice 2    | planned |
-| 11  | Inventory management              | Slice 3    | planned |
-| 12  | Delivery & shipping               | Slice 3    | planned |
-| 13  | Expenses & profit calculation     | Slice 3    | planned |
-| 14  | Dashboard                         | Slice 3    | planned |
-| 15  | Reports                           | Slice 4    | planned |
-| 16  | Search & filters                  | Slice 4    | planned |
-| 17  | Notifications                     | Slice 4    | planned |
-| 18  | Invoice generation                | Slice 4    | planned |
+| #   | Feature                           | Phase      | Status      |
+| --- | --------------------------------- | ---------- | ----------- |
+| 1   | Stack & architecture              | Foundation | done        |
+| 2   | Data model                        | Foundation | done        |
+| 3   | Coding standards & tooling        | Foundation | done        |
+| 4   | Design system & UI foundation     | Foundation | done        |
+| 5   | Authentication & tenant isolation | Slice 1    | done        |
+| 6   | Business profile & onboarding     | Slice 1    | done        |
+| 7   | Customers                         | Slice 1    | in-progress |
+| 8   | Products & categories             | Slice 2    | planned     |
+| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned     |
+| 10  | Payments                          | Slice 2    | planned     |
+| 11  | Inventory management              | Slice 3    | planned     |
+| 12  | Delivery & shipping               | Slice 3    | planned     |
+| 13  | Expenses & profit calculation     | Slice 3    | planned     |
+| 14  | Dashboard                         | Slice 3    | planned     |
+| 15  | Reports                           | Slice 4    | planned     |
+| 16  | Search & filters                  | Slice 4    | planned     |
+| 17  | Notifications                     | Slice 4    | planned     |
+| 18  | Invoice generation                | Slice 4    | planned     |
 
 ## Foundations
 
@@ -118,18 +118,23 @@ Registration flow creates business account, collects business info (name, logo, 
 - [x] Review it (fresh model): `/check review business onboarding`
       Findings [2026-09-24-feat-business-backend](https://github.com/review) — 3 blockers, 3 major, 6 minor, 6 nits. Verified by claude-sonnet-4-6. All 3 blockers addressed in commit 9196280: (1) onboarding gate now runs inside `runWithContext` with proper error handling, (2) `DraftSaveSchema` Zod validation added for field whitelist, (3) `onboarding.middleware.ts` deleted.
 
-### 7. Customers · in progress (designed)
+### 7. Customers · in-progress
 
 Customer CRUD, search/filter, order history and spending view, clickable phone on mobile.
 **Done when:** user can create/edit/search customers and see customer profile with order history.
 
 - [x] Design it (spec): `/architect customers`
-      Spec [0005](../specs/0005-customers.md)
-- [ ] Build it: `/develop customers`
-  - [ ] Data model: customer fields, indexes, audit log, and backfill (AC-4, AC-5, AC-7, AC-8, AC-10)
-  - [ ] Create, edit, and phone rules (AC-1, AC-2, AC-3, AC-4)
-  - [ ] Search, profile, order history, archive, restore, and role checks (AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-11)
-  - [ ] Customers screens: search, create, edit, profile, archive, restore (AC-1, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-9)
+      Spec [0005](../specs/0005-customers/index.md)
+- [x] Build it: `/develop customers`
+  - [x] Data and transaction foundation, indexes, backfill, and legacy order handling (AC-4, AC-5, AC-7, AC-8, AC-10, AC-12)
+  - [x] Customer domain and API for create, edit, archive, restore, validation, and concurrency (AC-1, AC-2, AC-3, AC-4, AC-8, AC-9, AC-10)
+  - [x] Search, profile totals, order history, cursors, and tenant access (AC-5, AC-6, AC-7, AC-11, AC-12)
+  - [x] Customer screens for search, create, edit, profile, archive, restore, and timeout recovery (AC-1, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-12)
+        Code in `backend/src/application/services/customer.service.ts`, `backend/src/presentation/controllers/customer.controller.ts`, `frontend/src/app/customers/`
+- [ ] Verify it: `/check verify customers`
+- [ ] Test it: `/test customers`
+- [ ] Review it (fresh model): `/check review customers`
+- [ ] Document it: `/document customers`
 
 ## Slice 2: Product & Order Workflow
 

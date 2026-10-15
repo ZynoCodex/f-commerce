@@ -19,7 +19,7 @@ import {
   Textarea,
 } from '@/components/ui/primitives';
 import { AppShell } from '@/components/shell/shell';
-import { apiFetch } from '@/lib/auth-client';
+import { apiFetch, isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import type { CustomerOrderDto, CustomerProfileDto } from '@f-commerce/contracts';
 
@@ -206,7 +206,9 @@ export default function CustomerProfilePage() {
         throw new Error(data.message || data.error || 'Failed to save changes');
       }
 
-      setCustomer(data.data);
+      // The edit response is a plain customer, so merge it into the profile to
+      // keep the spend summary the profile response supplied.
+      setCustomer({ ...customer, ...data.data });
       setEditOpen(false);
       setNotice('Customer updated');
     } catch (err) {
@@ -215,6 +217,27 @@ export default function CustomerProfilePage() {
       setIsSaving(false);
     }
   };
+
+  /**
+   * A request timed out, so whether it committed is unknown. Reload and report
+   * the state that actually landed rather than assuming the request failed.
+   */
+  const reconcileAfterTimeout = useCallback(async () => {
+    try {
+      const result = await fetchProfile();
+      setCustomer(result.customer);
+      setOrders(result.orders);
+      setNotice(
+        result.customer.archivedAt
+          ? 'That request took too long. We reloaded the customer: they are archived.'
+          : 'That request took too long. We reloaded the customer: they are active.',
+      );
+    } catch {
+      setActionError(
+        'That request took too long and the customer could not be reloaded. Reload the page to check their state.',
+      );
+    }
+  }, [fetchProfile]);
 
   const archive = async () => {
     if (!customer) return;
@@ -230,7 +253,9 @@ export default function CustomerProfilePage() {
 
       if (res.status === 409 && data.error === 'CUSTOMER_CHANGED') {
         await reload();
-        setNotice('This customer changed before the archive. Check the newest details and try again.');
+        setNotice(
+          'This customer changed before the archive. Check the newest details and try again.',
+        );
         return;
       }
       if (!res.ok) {
@@ -240,6 +265,10 @@ export default function CustomerProfilePage() {
       setCustomer({ ...customer, ...data.data });
       setNotice('Customer archived. Their orders stay linked.');
     } catch (err) {
+      if (isTimeoutError(err)) {
+        await reconcileAfterTimeout();
+        return;
+      }
       setActionError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsArchiving(false);
@@ -260,7 +289,9 @@ export default function CustomerProfilePage() {
 
       if (res.status === 409 && data.error === 'CUSTOMER_CHANGED') {
         await reload();
-        setNotice('This customer changed before the restore. Check the newest details and try again.');
+        setNotice(
+          'This customer changed before the restore. Check the newest details and try again.',
+        );
         return;
       }
       if (res.status === 409 && data.error === 'PHONE_IN_USE') {
@@ -274,6 +305,10 @@ export default function CustomerProfilePage() {
       setCustomer({ ...customer, ...data.data });
       setNotice('Customer restored and back in your lists.');
     } catch (err) {
+      if (isTimeoutError(err)) {
+        await reconcileAfterTimeout();
+        return;
+      }
       setActionError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsArchiving(false);
@@ -412,9 +447,7 @@ export default function CustomerProfilePage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <Card className="grid gap-2">
                   <p className="text-sm font-semibold text-body">Orders</p>
-                  <p className="font-mono text-2xl font-semibold text-ink">
-                    {customer.orderCount}
-                  </p>
+                  <p className="font-mono text-2xl font-semibold text-ink">{customer.orderCount}</p>
                   <p className="text-sm text-muted">Cancelled and returned orders excluded</p>
                 </Card>
                 <Card className="grid gap-2">
