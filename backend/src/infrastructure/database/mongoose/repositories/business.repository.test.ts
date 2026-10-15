@@ -104,7 +104,7 @@ describe('MongooseBusinessRepository', () => {
       expect(BusinessModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'biz1',
         { name: 'Updated Name', currency: 'USD' },
-        { new: true },
+        { returnDocument: 'after' },
       );
       expect(result).not.toBeNull();
       expect(result!.name).toBe('Updated Name');

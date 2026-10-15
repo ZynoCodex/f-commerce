@@ -47,7 +47,7 @@ export class MongooseBusinessRepository implements IBusinessRepository {
     if (data.onboardingComplete !== undefined) update.onboardingComplete = data.onboardingComplete;
     if (data.onboardingDraft !== undefined) update.onboardingDraft = data.onboardingDraft;
 
-    const doc = await BusinessModel.findByIdAndUpdate(id, update, { new: true }).lean();
+    const doc = await BusinessModel.findByIdAndUpdate(id, update, { returnDocument: 'after' }).lean();
     if (!doc) return null;
 
     return {

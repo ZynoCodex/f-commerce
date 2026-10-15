@@ -131,7 +131,7 @@ export class MongooseCustomerRepository implements ICustomerRepository {
     const doc = await CustomerModel.findOneAndUpdate(
       { _id: objectId(id), version: expectedVersion },
       update,
-      { new: true },
+      { returnDocument: 'after' },
     ).lean<Record<string, unknown>>();
 
     return doc ? toCustomer(doc) : null;
@@ -267,7 +267,7 @@ export class MongooseCustomerRepository implements ICustomerRepository {
         const doc = await CustomerModel.findOneAndUpdate(
           { _id: objectId(id), version: expectedVersion },
           update,
-          { new: true, session },
+          { returnDocument: 'after', session },
         ).lean<Record<string, unknown>>();
 
         if (!doc) {

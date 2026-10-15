@@ -24,7 +24,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${plexMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${dmSans.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <ThemeBoundary>{children}</ThemeBoundary>
       </body>
