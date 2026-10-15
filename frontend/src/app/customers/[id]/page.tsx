@@ -440,6 +440,14 @@ export default function CustomerProfilePage() {
               </Alert>
             )}
 
+            {customer.archivedAt && (
+              <Alert>
+                <div>
+                  This customer is archived. They are archived and cannot be used for new transactions.
+                </div>
+              </Alert>
+            )}
+
             <section aria-labelledby="spend-title" className="grid gap-4">
               <h2 className="text-xl font-semibold text-ink" id="spend-title">
                 Spend summary
