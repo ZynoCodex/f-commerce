@@ -100,7 +100,7 @@ test.describe('customer records', () => {
       .getByRole('button', { name: /^archive$/i })
       .first()
       .click();
-    await expect(page.getByText(/archived/i).first()).toBeVisible();
+    await expect(page.getByText(/cannot be used for new transactions/i)).toBeVisible();
   });
 
   test('duplicate phone is blocked and links to the existing customer', async ({
@@ -168,7 +168,12 @@ test.describe('customer records', () => {
       .click();
 
     // The client reloads and reports the committed state rather than an error.
-    await expect(page.getByText(/took too long/i)).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/they are archived/i)).toBeVisible();
+    // Match each message on text only it contains: the bare /they are archived/i
+    // also matches the timeout notice, and Playwright's strict mode rejects
+    // locators that resolve to more than one element.
+    await expect(page.getByText(/reloaded the customer: they are archived/i)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText(/cannot be used for new transactions/i)).toBeVisible();
   });
 });
