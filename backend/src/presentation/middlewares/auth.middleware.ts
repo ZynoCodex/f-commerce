@@ -11,12 +11,10 @@ interface JwtPayload {
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
-    res
-      .status(401)
-      .json({
-        error: 'Missing or invalid authorization header',
-        message: 'Missing or invalid authorization header',
-      });
+    res.status(401).json({
+      error: 'Missing or invalid authorization header',
+      message: 'Missing or invalid authorization header',
+    });
     return;
   }
 
@@ -55,22 +53,18 @@ export function requireBusinessRole(allowedRoles: ('OWNER' | 'STAFF')[]) {
 
     const membership = user.memberships.find((m) => m.businessId === businessId);
     if (!membership) {
-      res
-        .status(403)
-        .json({
-          error: 'You do not have access to this business',
-          message: 'You do not have access to this business',
-        });
+      res.status(403).json({
+        error: 'You do not have access to this business',
+        message: 'You do not have access to this business',
+      });
       return;
     }
 
     if (!allowedRoles.includes(membership.role)) {
-      res
-        .status(403)
-        .json({
-          error: 'Insufficient permissions',
-          message: 'You do not have permission to perform this action',
-        });
+      res.status(403).json({
+        error: 'Insufficient permissions',
+        message: 'You do not have permission to perform this action',
+      });
       return;
     }
 

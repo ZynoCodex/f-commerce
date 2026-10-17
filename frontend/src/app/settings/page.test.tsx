@@ -12,7 +12,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => stableRouter,
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 import SettingsPage from './page';
 
 function jsonResponse(status: number, body: object): Response {
@@ -70,12 +69,8 @@ describe('SettingsPage', () => {
       </ThemeBoundary>,
     );
 
-    expect(
-      await screen.findByRole('heading', { name: /business profile/i }),
-    ).toBeVisible();
-    expect(screen.getByRole('textbox', { name: /business name/i })).toHaveValue(
-      'Maya Traders',
-    );
+    expect(await screen.findByRole('heading', { name: /business profile/i })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: /business name/i })).toHaveValue('Maya Traders');
     expect(screen.getByLabelText(/currency/i)).toHaveValue('BDT');
     expect(screen.getByRole('textbox', { name: /street/i })).toHaveValue('123 Main St');
     expect(screen.getByRole('textbox', { name: /city/i })).toHaveValue('Dhaka');
@@ -164,9 +159,10 @@ describe('SettingsPage', () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, { success: true, data: businessData }))
       .mockImplementationOnce(
-        () => new Promise<Response>((resolve) => {
-          resolveSave = resolve;
-        }),
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSave = resolve;
+          }),
       );
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();

@@ -10,7 +10,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 import DashboardPage from './page';
 
 describe('DashboardPage', () => {

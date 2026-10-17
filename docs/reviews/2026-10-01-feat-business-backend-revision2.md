@@ -19,6 +19,7 @@ None
 **Problem**: The draft save functionality uses module-level global variables (`savedDraftCache`, `pendingSave`, `draftDebounceTimer`) instead of React state or a proper hook.
 
 **Why it matters**: This is an anti-pattern in React. Module-level mutable state:
+
 - Can cause memory leaks if not properly cleaned up (partially mitigated by the cleanup effect)
 - Doesn't work correctly with Fast Refresh during development
 - Makes the code harder to test and reason about
@@ -58,10 +59,12 @@ None
 ## Test coverage
 
 The new logic has adequate test coverage:
+
 - Backend: 10 test files, 88 tests covering auth controllers, business service, and business controller
 - Frontend: 7 test files, 44 tests covering onboarding page, login, auth-guard
 
 New tests added:
+
 - `business.controller.test.ts` - 5 integration tests for logo upload persistence workflow
 - Updated `business.service.test.ts` - 1 test for `updateBusiness` with logo URL
 

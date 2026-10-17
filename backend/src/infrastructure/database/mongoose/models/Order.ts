@@ -53,6 +53,9 @@ OrderSchema.index(
   { unique: true, partialFilterExpression: { idempotencyKey: { $exists: true, $type: 'string' } } },
 );
 
+// Serves customer order history: scoped lookup plus newest first sort
+OrderSchema.index({ businessId: 1, customerId: 1, createdAt: -1 });
+
 export const OrderModel = mongoose.model<OrderDocument>('Order', OrderSchema);
 
 export interface OrderItemDocument extends Document {

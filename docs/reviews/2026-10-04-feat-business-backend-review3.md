@@ -147,6 +147,7 @@ All 1 Blocker and 5 Major findings from this review have been fixed on the branc
 Test signal is configured and suites pass (88 backend, 46 frontend per verify.md; two new untracked suites: `business.controller.test.ts`, `cloudinary.service.test.ts`). Coverage is good for happy paths, magic-byte rejection, role gating, and auth redirects.
 
 **New regression tests added alongside the fixes above:**
+
 - `packages/contracts/src/index.test.ts`: 9 new tests — `BusinessProfileUpdateSchema` partial update doesn't reset currency, rejects invalid currency, all fields optional; `DraftSaveSchema` per-field value validation including `INVALID_CURRENCY` rejection.
 - `backend/src/presentation/controllers/business.controller.route.test.ts`: 2 new tests — non-member rejected before DB access (no `getBusiness` call), 403 onboarding gate includes `message` field.
 - `frontend/src/app/onboarding/page.test.ts`: 1 new test — `aria-invalid` is true when empty and false when filled; existing pre-fill test updated to correct response shape.

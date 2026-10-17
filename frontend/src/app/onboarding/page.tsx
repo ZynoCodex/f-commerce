@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
 import { apiFetch } from '@/lib/auth-client';
@@ -473,10 +474,15 @@ function StepThree({
           htmlFor="logo-upload"
         >
           {logoPreview ? (
-            <img
+            // A local blob object URL (or the stored Cloudinary URL on resume)
+            // cannot be fetched by the optimizer, so serve the src as-is.
+            <Image
               alt="Logo preview"
               className="h-20 w-20 rounded object-contain"
+              height={80}
               src={logoPreview}
+              unoptimized
+              width={80}
             />
           ) : (
             <span className="text-sm text-muted">
@@ -523,7 +529,16 @@ function StepFour({
       <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
         <div className="flex items-center gap-4">
           {form.logoUrl ? (
-            <img alt="Logo" className="h-12 w-12 rounded object-contain" src={form.logoUrl} />
+            // Cloudinary already serves the stored asset from its CDN; keep the
+            // URL as-is instead of proxying it through the image optimizer.
+            <Image
+              alt="Logo"
+              className="h-12 w-12 rounded object-contain"
+              height={48}
+              src={form.logoUrl}
+              unoptimized
+              width={48}
+            />
           ) : (
             <div className="flex h-12 w-12 items-center justify-center rounded bg-sky-soft text-sky-strong font-mono">
               {form.name.slice(0, 2).toUpperCase() || 'BT'}

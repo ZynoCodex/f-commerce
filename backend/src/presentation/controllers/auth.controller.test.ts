@@ -55,7 +55,9 @@ describe('Auth Controller', () => {
 
     it('returns 201 with businessId extracted from token', async () => {
       // Create a valid JWT payload with businessId: biz-1
-      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const payload = Buffer.from(
+        JSON.stringify({ memberships: [{ businessId: 'biz-1' }] }),
+      ).toString('base64');
       const fullToken = `access.${payload}.signature`;
       vi.mocked(AuthService.prototype.register).mockResolvedValueOnce({
         accessToken: fullToken,
@@ -142,7 +144,9 @@ describe('Auth Controller', () => {
   describe('POST /api/auth/login', () => {
     it('returns 200 on success with businessId extracted from token', async () => {
       // Create a valid JWT payload with businessId: biz-1
-      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const payload = Buffer.from(
+        JSON.stringify({ memberships: [{ businessId: 'biz-1' }] }),
+      ).toString('base64');
       const fullToken = `access.${payload}.signature`;
       vi.mocked(AuthService.prototype.login).mockResolvedValueOnce({
         accessToken: fullToken,
@@ -191,7 +195,9 @@ describe('Auth Controller', () => {
   describe('POST /api/auth/oauth/:provider', () => {
     it('returns 200 on OAuth success with businessId extracted from token', async () => {
       // Create a valid JWT payload with businessId: biz-1
-      const payload = Buffer.from(JSON.stringify({ memberships: [{ businessId: 'biz-1' }] })).toString('base64');
+      const payload = Buffer.from(
+        JSON.stringify({ memberships: [{ businessId: 'biz-1' }] }),
+      ).toString('base64');
       const fullToken = `oauth_access.${payload}.signature`;
       vi.mocked(AuthService.prototype.oauthLogin).mockResolvedValueOnce({
         accessToken: fullToken,
@@ -290,9 +296,7 @@ describe('Auth Controller', () => {
     });
 
     it('returns 500 when logout service fails', async () => {
-      vi.mocked(AuthService.prototype.logout).mockRejectedValueOnce(
-        new Error('Database error'),
-      );
+      vi.mocked(AuthService.prototype.logout).mockRejectedValueOnce(new Error('Database error'));
 
       const res = await request(app)
         .post('/api/auth/logout')

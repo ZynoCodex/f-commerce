@@ -10,3 +10,4 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 export * from './auth.js';
 export * from './business.js';
+export * from './customer.js';

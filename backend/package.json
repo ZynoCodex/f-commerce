@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pretest": "npm run build --workspace @f-commerce/contracts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backfill:customers": "tsx src/scripts/backfill-customer-version.ts"
   },
   "dependencies": {
     "@f-commerce/contracts": "*",
@@ -32,6 +33,7 @@
     "@types/node": "^22.15.0",
     "@types/supertest": "^7.2.1",
     "dotenv": "^18.0.3",
+    "mongodb-memory-server": "^11.3.0",
     "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",

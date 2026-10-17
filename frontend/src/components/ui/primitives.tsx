@@ -231,20 +231,25 @@ export function FilterBar({ children }: { children: ReactNode }) {
 
 function useOverlay(onClose: () => void, open: boolean) {
   const ref = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       previous?.focus();
     };
-  }, [onClose, open]);
+  }, [open]);
 
   return ref;
 }
@@ -329,7 +334,7 @@ export function Sheet({
             Close
           </IconButton>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </aside>
     </div>
   );

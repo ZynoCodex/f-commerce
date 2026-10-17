@@ -4,3 +4,4 @@ node_modules
 dist/
 .claude/settings-openrouter.local.json
 .claude/*.local.json
+test-results/

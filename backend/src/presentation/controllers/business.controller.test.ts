@@ -63,9 +63,7 @@ describe('Business Service Integration Tests', () => {
       });
 
       // Mock updateBusiness to return the updated business with the logo URL
-      mockBusinessRepository.updateProfile.mockResolvedValueOnce(
-        makeBusiness({ logoUrl })
-      );
+      mockBusinessRepository.updateProfile.mockResolvedValueOnce(makeBusiness({ logoUrl }));
 
       // Step 1: Upload logo
       const uploadResult = await businessService.uploadLogo('biz1', Buffer.from('fake-image'));
@@ -80,12 +78,11 @@ describe('Business Service Integration Tests', () => {
     });
 
     it('preserves previously uploaded logo during onboarding completion', async () => {
-      const logoUrl = 'https://res.cloudinary.com/demo/image/upload/v123/business-logos/prior-upload.png';
+      const logoUrl =
+        'https://res.cloudinary.com/demo/image/upload/v123/business-logos/prior-upload.png';
 
       // First, simulate a prior logo upload that was persisted
-      mockBusinessRepository.updateProfile.mockResolvedValueOnce(
-        makeBusiness({ logoUrl })
-      );
+      mockBusinessRepository.updateProfile.mockResolvedValueOnce(makeBusiness({ logoUrl }));
 
       // Then, complete onboarding (which includes logoUrl in the update)
       mockBusinessRepository.updateProfile.mockResolvedValueOnce(
@@ -93,7 +90,7 @@ describe('Business Service Integration Tests', () => {
           name: 'My Business',
           onboardingComplete: true,
           logoUrl, // Should preserve this
-        })
+        }),
       );
       mockBusinessRepository.clearDraft.mockResolvedValueOnce(undefined);
 
@@ -136,10 +133,7 @@ describe('Business Service Integration Tests', () => {
 
       const result = await businessService.uploadLogo('biz1', Buffer.from('image'));
 
-      expect(mockCloudinaryService.uploadImage).toHaveBeenCalledWith(
-        Buffer.from('image'),
-        'biz1',
-      );
+      expect(mockCloudinaryService.uploadImage).toHaveBeenCalledWith(Buffer.from('image'), 'biz1');
       expect(result.logoUrl).toBe(logoUrl);
     });
 
@@ -147,7 +141,7 @@ describe('Business Service Integration Tests', () => {
       mockCloudinaryService.uploadImage.mockRejectedValueOnce(new Error('Upload failed'));
 
       await expect(businessService.uploadLogo('biz1', Buffer.from('image'))).rejects.toThrow(
-        'Upload failed'
+        'Upload failed',
       );
     });
   });

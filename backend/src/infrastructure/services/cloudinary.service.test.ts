@@ -36,7 +36,13 @@ describe('CloudinaryService', () => {
     it('resolves with secure_url and public_id on success', async () => {
       const buffer = Buffer.from('image-data');
       uploadStreamMock.mockImplementation(
-        (_options: unknown, callback: (error: Error | null, result?: { secure_url: string; public_id: string }) => void) => {
+        (
+          _options: unknown,
+          callback: (
+            error: Error | null,
+            result?: { secure_url: string; public_id: string },
+          ) => void,
+        ) => {
           callback(null, {
             secure_url: 'https://res.cloudinary.com/test/image.png',
             public_id: 'business-logos/biz1/abc',
@@ -56,7 +62,13 @@ describe('CloudinaryService', () => {
     it('uses a business specific folder when businessId is provided', async () => {
       const buffer = Buffer.from('image-data');
       uploadStreamMock.mockImplementation(
-        (_options: unknown, callback: (error: Error | null, result?: { secure_url: string; public_id: string }) => void) => {
+        (
+          _options: unknown,
+          callback: (
+            error: Error | null,
+            result?: { secure_url: string; public_id: string },
+          ) => void,
+        ) => {
           callback(null, { secure_url: 'u', public_id: 'p' });
           return { end: vi.fn() };
         },
@@ -73,7 +85,13 @@ describe('CloudinaryService', () => {
     it('uses a generic folder when businessId is omitted', async () => {
       const buffer = Buffer.from('image-data');
       uploadStreamMock.mockImplementation(
-        (_options: unknown, callback: (error: Error | null, result?: { secure_url: string; public_id: string }) => void) => {
+        (
+          _options: unknown,
+          callback: (
+            error: Error | null,
+            result?: { secure_url: string; public_id: string },
+          ) => void,
+        ) => {
           callback(null, { secure_url: 'u', public_id: 'p' });
           return { end: vi.fn() };
         },
@@ -90,7 +108,13 @@ describe('CloudinaryService', () => {
     it('sets resource_type to image', async () => {
       const buffer = Buffer.from('image-data');
       uploadStreamMock.mockImplementation(
-        (_options: unknown, callback: (error: Error | null, result?: { secure_url: string; public_id: string }) => void) => {
+        (
+          _options: unknown,
+          callback: (
+            error: Error | null,
+            result?: { secure_url: string; public_id: string },
+          ) => void,
+        ) => {
           callback(null, { secure_url: 'u', public_id: 'p' });
           return { end: vi.fn() };
         },
@@ -107,7 +131,13 @@ describe('CloudinaryService', () => {
     it('rejects when cloudinary returns an error', async () => {
       const buffer = Buffer.from('image-data');
       uploadStreamMock.mockImplementation(
-        (_options: unknown, callback: (error: Error | null, result?: { secure_url: string; public_id: string }) => void) => {
+        (
+          _options: unknown,
+          callback: (
+            error: Error | null,
+            result?: { secure_url: string; public_id: string },
+          ) => void,
+        ) => {
           callback(new Error('Upload failed'));
           return { end: vi.fn() };
         },

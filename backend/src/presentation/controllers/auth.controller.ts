@@ -64,7 +64,8 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     try {
       const payload = tokens.accessToken.split('.')[1];
       if (payload) {
-        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]
+          ?.businessId;
       }
     } catch {
       // Token decode failed, leave businessId undefined
@@ -100,7 +101,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     try {
       const payload = tokens.accessToken.split('.')[1];
       if (payload) {
-        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]
+          ?.businessId;
       }
     } catch {
       // Token decode failed, leave businessId undefined
@@ -143,7 +145,8 @@ authRouter.post('/oauth/:provider', async (req: Request, res: Response) => {
     try {
       const payload = tokens.accessToken.split('.')[1];
       if (payload) {
-        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]?.businessId;
+        businessId = JSON.parse(Buffer.from(payload, 'base64').toString()).memberships?.[0]
+          ?.businessId;
       }
     } catch {
       // Token decode failed, leave businessId undefined

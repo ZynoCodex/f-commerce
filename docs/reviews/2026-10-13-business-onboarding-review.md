@@ -31,7 +31,7 @@ No blockers. All acceptance criteria verified in previous `/check verify` run.
 
 2. Controllers correctly handle the null case:
    - `GET /me` (line 149-153): checks for null and returns 404
-   - `PUT /me` (line 189-192): checks for null and returns 404  
+   - `PUT /me` (line 189-192): checks for null and returns 404
    - `PUT /onboarding` (line 289-292): checks for null and returns 404
 
 3. `NotFoundError` is only thrown by `auth.service.ts`, not business service. The catch blocks returning 500 are for unexpected errors (DB connection issues), not "not found" cases.
@@ -53,6 +53,7 @@ No blockers. All acceptance criteria verified in previous `/check verify` run.
 **Impact**: Limited. The tests pass, but the fixtures could be reused for consistency.
 
 **Recommendation**: Either use these fixture files in tests or remove them. If they're meant for image upload edge cases, add tests using them:
+
 ```typescript
 // Instead of inline Buffer.from(...)
 const validPng = fs.readFileSync(path.join(__dirname, '../../test-valid.png'));
@@ -102,11 +103,13 @@ const validPng = fs.readFileSync(path.join(__dirname, '../../test-valid.png'));
 ## Coverage Analysis
 
 **Tests written/extended**:
+
 - backend/src/presentation/controllers/auth.controller.test.ts (+7 tests)
 - backend/src/presentation/middlewares/auth.middleware.test.ts (+2 tests)
 - frontend/e2e/business-onboarding.spec.ts (complete rewrite fixing hardcoded credentials)
 
 **Acceptance Criteria Trace**:
+
 - AC-1: ✅ Verified via register + wizard flow → dashboard
 - AC-2: ✅ Zod validation tests for registration and onboarding
 - AC-3: ✅ Magic-byte validation tests, 500/502 error propagation
@@ -122,10 +125,11 @@ The business onboarding feature is well-engineered with solid test coverage. The
 This is a documentation-only review finding correction, not a code issue.
 
 **Next steps**:
+
 1. Update verify.md wizard step count comment
 2. Merge via PR
 3. Update docs/scope/scope.md: mark feature as `done`
 
 ---
 
-*Reviewed by DeepSeek V4 Flash on 2026-10-13*
+_Reviewed by DeepSeek V4 Flash on 2026-10-13_
