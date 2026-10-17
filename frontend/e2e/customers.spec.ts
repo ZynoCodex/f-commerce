@@ -152,10 +152,11 @@ test.describe('customer records', () => {
 
     // Archive on the server, then make the client's archive call hang so the
     // 10 second client timeout fires (spec 0005 key invariants).
-    await apiRequest.post(`/api/customers/${id}/archive`, {
+    const archived = await apiRequest.post(`/api/customers/${id}/archive`, {
       data: { version: 1 },
       headers: { Authorization: `Bearer ${accessToken}`, 'x-business-id': businessId },
     });
+    expect(archived.ok()).toBe(true);
     await page.route(`**/api/customers/${id}/archive`, async () => {
       // Never fulfil: the abort controller rejects the request after 10s.
       await new Promise(() => {});
