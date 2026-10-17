@@ -12,7 +12,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => stableRouter,
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 import SettingsPage from './page';
 
 function jsonResponse(status: number, body: object): Response {

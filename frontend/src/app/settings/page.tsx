@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
@@ -135,10 +136,13 @@ export default function SettingsPage() {
 
       {business?.logoUrl && (
         <div className="flex items-center gap-4">
-          <img
+          <Image
             alt="Business logo"
             className="h-12 w-12 rounded object-contain"
+            height={48}
             src={business.logoUrl}
+            unoptimized
+            width={48}
           />
           <span className="text-sm text-muted">Logo is set via the onboarding wizard</span>
         </div>

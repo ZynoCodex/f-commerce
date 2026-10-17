@@ -64,9 +64,10 @@ The following acceptance criteria are verified at the backend level through 245 
 
 ## Bug fix verified
 
-Fixed focus issue in customer creation form where each keystroke caused the input to lose focus. The `Sheet` component's `useOverlay` hook was calling `focus()` on the `<aside>` container element instead of focusing the first input. 
+Fixed focus issue in customer creation form where each keystroke caused the input to lose focus. The `Sheet` component's `useOverlay` hook was calling `focus()` on the `<aside>` container element instead of focusing the first input.
 
 Changes made:
+
 - Added `useRef` to import in `customers/page.tsx`
 - Added `nameInputRef` to focus the name input directly when the form opens
 - Updated `Input`, `Select`, and `Textarea` components in `primitives.tsx` to forward refs for focus management

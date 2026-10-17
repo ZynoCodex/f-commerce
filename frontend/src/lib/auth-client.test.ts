@@ -12,11 +12,6 @@ import {
 const TOKEN_KEY = 'accessToken';
 const BUSINESS_ID_KEY = 'businessId';
 
-function makeToken(payload: object): string {
-  const b64 = (obj: object) => Buffer.from(JSON.stringify(obj)).toString('base64');
-  return ['hmac-sha256', b64(payload), 'sig'].join('.');
-}
-
 describe('auth-client', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -176,6 +171,3 @@ describe('auth-client', () => {
     });
   });
 });
-
-// makeToken is intentionally NOT exported; it is a local helper.
-// Other test files define their own token fixture.

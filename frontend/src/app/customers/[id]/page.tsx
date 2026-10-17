@@ -443,7 +443,8 @@ export default function CustomerProfilePage() {
             {customer.archivedAt && (
               <Alert>
                 <div>
-                  This customer is archived. They are archived and cannot be used for new transactions.
+                  This customer is archived. They are archived and cannot be used for new
+                  transactions.
                 </div>
               </Alert>
             )}

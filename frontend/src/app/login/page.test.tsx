@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeBoundary } from '@/components/theme/theme';
-import { clearAuth, getAuth, setAuth } from '@/lib/auth-client';
+import { getAuth, setAuth } from '@/lib/auth-client';
 
 const replaceMock = vi.fn();
 const stableRouter = { replace: replaceMock };
@@ -12,7 +12,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => stableRouter,
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 import LoginPage from './page';
 
 function jsonResponse(status: number, body: object): Response {
