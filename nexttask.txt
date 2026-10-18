@@ -1,0 +1,28 @@
+The migration is complete and verified end to end. Here's the summary.
+What changed
+Database layer (Mongoose → PostgreSQL + Drizzle)
+- backend/src/infrastructure/database/drizzle/schema.ts — all 16 tables with real FKs, partial unique indexes (product/variant SKU, order idempotency key), and lower(name) expression indexes for case-insensitive search/sort/uniqueness.
+- backend/drizzle/migrations/0000_init.sql — generated with drizzle-kit, applied to your local f-commerce database (16 tables, 6 special indexes confirmed present).
+- Repositories: DrizzleAuthRepository, DrizzleBusinessRepository, DrizzleCustomerRepository (version guards, cursor paging, archive/restore + audit in one transaction).
+- Deleted the entire database/mongoose/ tree, test-support/mongo-replset.ts, pg-test-container.ts, scripts/backfill-customer-version.ts, and the Mongo-only tests. mongoose, mongodb-memory-server (never declared) and pg-mem are gone from the dependency tree.
+Tests now run against real PostgreSQL
+- backend/src/test-support/pg-test-database.ts creates <database>-test, applies migrations, truncates between tests; vitest.config.ts serializes test files.
+- customer.controller.route.test.ts and business.repository.integration.test.ts ported off Mongoose. The old vi.spyOn(AuditLogModel, 'create') rollback test is now an actor token with an invalid UUID user id, so the audit insert fails inside the transaction and proves the rollback for real.
+- Result: 232 backend tests in 15 files pass, plus frontend (7 files) and contracts (1 file).
+Bugs found and fixed while porting
+- isDuplicateKeyError only read error.code; Drizzle wraps driver errors, so a duplicate-phone race would have returned 500 instead of 409. It now walks the cause chain.
+- saveDraft used jsonb_build_object($1, …), which Postgres can't type-infer; it now merges a single jsonb parameter.
+- toBusiness cast a null draft through instead of mapping it to undefined.
+- User.passwordHash is now optional, matching the nullable column and OAuth-only accounts.
+Infrastructure and docs
+- docker-compose.yml runs postgres:18 (matching your local 18.6) plus Redis; .github/workflows/ci.yml starts Postgres, runs the suite with DATABASE_URL, applies migrations, then boots the backend.
+- backend/.env and .env.example now use DATABASE_URL (and document TEST_DATABASE_URL).
+- Updated root and backend AGENTS.md (stack, tenant-isolation model, test-DB rules, db:generate/db:migrate commands) and added dated delta notes to specs 0001, 0002, 0003, 0005, and 0006 — including the normalized product_variants delta you asked for.
+Verification
+- lint, typecheck, format:check, build — all green across workspaces.
+- Live smoke test against local Postgres: register → draft save → onboarding complete → customer create → duplicate-phone 409 → prefix search → edit → profile with spend totals → archive → restore → stale-version 409 → login. Rows and both audit entries verified directly in Postgres, then the smoke data was truncated.
+Suggested next steps
+- Products/categories (spec 0006 milestone 1, scope row 8) is next; the schema it needs already exists.
+- I didn't run the Playwright suite locally (needs browsers plus a long-running stack) — CI covers it with the new Postgres steps.
+- Pre-existing unrelated wrinkle: .env.example documents JWT_ACCESS_SECRET/JWT_ACCESS_TTL but config.ts reads JWT_SECRET/JWT_REFRESH_SECRET; defaults keep it working, but worth aligning.
+- If you want the migration recorded as its own decision document, /architect can write docs/specs/0007-…; I only added delta notes so the existing specs stay honest without rewriting their history.
