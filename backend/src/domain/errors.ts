@@ -88,3 +88,75 @@ export class PhoneInUseError extends DomainError {
     super(message);
   }
 }
+
+// --- Product errors ---
+
+export class ProductNotFoundError extends NotFoundError {
+  constructor() {
+    super('Product not found');
+  }
+}
+
+export class ProductChangedError extends ConflictError {
+  constructor() {
+    super('This product was changed by someone else');
+  }
+}
+
+export class ProductArchivedError extends ConflictError {
+  constructor() {
+    super('This product is archived');
+  }
+}
+
+export class ProductNotArchivedError extends ConflictError {
+  constructor() {
+    super('This product is not archived');
+  }
+}
+
+export class ProductInUseError extends ConflictError {
+  constructor() {
+    super('This product has been referenced by an order and cannot be deleted');
+  }
+}
+
+export class DuplicateSkuError extends ConflictError {
+  constructor(
+    public readonly existingProductId: string,
+    public readonly existingVariantId: string | null,
+    public readonly archived: boolean,
+    message: string = 'A product or variant with this SKU already exists in this business',
+  ) {
+    super(message);
+  }
+}
+
+// --- Category errors ---
+
+export class CategoryNotFoundError extends NotFoundError {
+  constructor() {
+    super('Category not found');
+  }
+}
+
+export class CategoryChangedError extends ConflictError {
+  constructor() {
+    super('This category was changed by someone else');
+  }
+}
+
+export class CategoryInUseError extends ConflictError {
+  constructor(public readonly productCount: number) {
+    super(`This category is referenced by ${productCount} products`);
+  }
+}
+
+export class DuplicateCategoryError extends ConflictError {
+  constructor(
+    public readonly existingCategoryId: string,
+    message: string = 'A category with this name already exists in this business',
+  ) {
+    super(message);
+  }
+}
