@@ -1,7 +1,7 @@
 # 0005. Customer records with search, order history, and archive
 
 **Date**: 2026-10-14
-**Status**: done
+**Status**: Accepted
 
 > **Note (2026-10-18)**: Archive and restore still commit the state change and exactly one audit entry together, now as a PostgreSQL transaction through Drizzle. Local development and CI no longer need a MongoDB replica set: `docker-compose.yml` runs PostgreSQL 18 and `.github/workflows/ci.yml` starts a `postgres:18` container and applies `backend/drizzle/migrations` before the backend starts. Route and repository tests run against a real PostgreSQL database (`src/test-support/pg-test-database.ts`).
 
