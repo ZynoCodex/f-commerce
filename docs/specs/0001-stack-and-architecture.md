@@ -1,7 +1,7 @@
 # 0001. Adopt the project stack and architecture
 
 **Date**: 2026-09-08
-**Status**: In Progress
+**Status**: Accepted
 
 > **Revision (2026-10-18)**: The database choice changed from MongoDB + Mongoose to PostgreSQL 18 + Drizzle ORM after the first three features shipped, and the stack table and constraints below now record the new decision. In practice: `DATABASE_URL` replaces `MONGODB_URI`; Drizzle repositories replaced the Mongoose models and `backend/src/infrastructure/database/drizzle/schema.ts` is the source of truth for the data model; Docker Compose runs `postgres` and `redis` with no replica set; the JWT settings are `JWT_SECRET` and `JWT_REFRESH_SECRET` with token lifetimes fixed in code (15 minutes for access tokens, 7 days for refresh tokens); and backend tests run against a real PostgreSQL database that the test setup creates and migrates. Why: the catalog, orders, and customers are relational, and PostgreSQL enforces that shape with foreign keys, partial unique indexes, and transactions.
 
