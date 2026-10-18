@@ -39,28 +39,36 @@ describe('effectivePageSize', () => {
 });
 
 describe('customer search cursor', () => {
+  const CUSTOMER_ID = '00000000-0000-0000-0000-0000000000c1';
+
   // covers AC-8: cursors are opaque and bound to the query and page size they came from
   it('round-trips the sort key with the same query and limit', () => {
-    const encoded = encodeCustomerCursor({ name: 'Rahim', id: 'c1', q: 'ra', limit: 20 });
+    const encoded = encodeCustomerCursor({ name: 'Rahim', id: CUSTOMER_ID, q: 'ra', limit: 20 });
 
     expect(decodeCustomerCursor(encoded, 'ra', 20)).toEqual({
       name: 'Rahim',
-      id: 'c1',
+      id: CUSTOMER_ID,
       q: 'ra',
       limit: 20,
     });
   });
 
   it('rejects a cursor replayed against a different query', () => {
-    const encoded = encodeCustomerCursor({ name: 'Rahim', id: 'c1', q: 'ra', limit: 20 });
+    const encoded = encodeCustomerCursor({ name: 'Rahim', id: CUSTOMER_ID, q: 'ra', limit: 20 });
 
     expect(decodeCustomerCursor(encoded, 'karim', 20)).toBeNull();
   });
 
   it('rejects a cursor replayed with a different page size', () => {
-    const encoded = encodeCustomerCursor({ name: 'Rahim', id: 'c1', q: '', limit: 20 });
+    const encoded = encodeCustomerCursor({ name: 'Rahim', id: CUSTOMER_ID, q: '', limit: 20 });
 
     expect(decodeCustomerCursor(encoded, '', 10)).toBeNull();
+  });
+
+  it('rejects a sort key id that is not a UUID', () => {
+    const encoded = encodeCustomerCursor({ name: 'Rahim', id: 'c1', q: '', limit: 20 });
+
+    expect(decodeCustomerCursor(encoded, '', 20)).toBeNull();
   });
 
   it('rejects input that is not base64url', () => {
@@ -92,18 +100,30 @@ describe('customer search cursor', () => {
 });
 
 describe('order history cursor', () => {
+  const ORDER_ID = '00000000-0000-0000-0000-0000000000f1';
+
   // covers AC-9: order history pages are keyed on createdAt and id
   it('round-trips the sort key with the same limit', () => {
     const createdAt = new Date('2026-03-01T10:00:00.000Z');
-    const encoded = encodeOrderCursor({ createdAt, id: 'o1', limit: 20 });
+    const encoded = encodeOrderCursor({ createdAt, id: ORDER_ID, limit: 20 });
 
-    expect(decodeOrderCursor(encoded, 20)).toEqual({ createdAt, id: 'o1', limit: 20 });
+    expect(decodeOrderCursor(encoded, 20)).toEqual({ createdAt, id: ORDER_ID, limit: 20 });
+  });
+
+  it('rejects a sort key id that is not a UUID', () => {
+    const encoded = encodeOrderCursor({
+      createdAt: new Date('2026-03-01T10:00:00.000Z'),
+      id: 'o1',
+      limit: 20,
+    });
+
+    expect(decodeOrderCursor(encoded, 20)).toBeNull();
   });
 
   it('rejects a cursor replayed with a different page size', () => {
     const encoded = encodeOrderCursor({
       createdAt: new Date('2026-03-01T10:00:00.000Z'),
-      id: 'o1',
+      id: ORDER_ID,
       limit: 20,
     });
 

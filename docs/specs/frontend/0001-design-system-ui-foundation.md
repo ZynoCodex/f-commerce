@@ -1,7 +1,7 @@
 # 0001. Define the seller console design system and UI foundation
 
 **Date**: 2026-09-09
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

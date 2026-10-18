@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 // E2E for the customer records flow (spec 0005).
-// Requires the dev stack: backend on :4000, frontend on :3000, MongoDB replica set running.
+// Requires the dev stack: backend on :4000, frontend on :3000, PostgreSQL running.
 // Run with: npm run e2e --workspace @f-commerce/frontend
 
 test.use({ baseURL: 'http://localhost:3000' });
@@ -83,7 +83,10 @@ test.describe('customer records', () => {
 
     // Open the profile (AC-6)
     await nameLink.click();
-    await page.waitForURL(/\/customers\/[0-9a-f]{24}$/);
+    // Ids are UUIDs since the PostgreSQL migration, not 24-character ObjectIds.
+    await page.waitForURL(
+      /\/customers\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
     await expect(page.getByRole('link', { name: phone, exact: true })).toHaveAttribute(
       'href',
       `tel:${phone}`,

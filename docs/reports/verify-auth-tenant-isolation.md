@@ -1,5 +1,7 @@
 # /check verify Authentication & tenant isolation
 
+> **Note (2026-10-18)**: Recorded against the MongoDB backend before the PostgreSQL migration. `MONGODB_URI` is gone; the backend now reads `DATABASE_URL` and `server.ts` verifies the database after listening. This outcome is historical.
+
 ## Verification Verdict: **BLOCKED**
 
 ### Spec Contract Loaded

@@ -2,6 +2,8 @@
 
 _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
+> **Note (2026-10-18)**: The log below was recorded against the MongoDB backend. The store is now PostgreSQL 18 with Drizzle ORM, so the counts and environment details are historical: the suite now runs against a real Postgres test database created and migrated automatically by `backend/src/test-support/pg-test-database.ts`, with no replica set and no `MONGODB_URI`. The archive, restore and audit-transaction guarantees are covered by `customer.repository.integration.test.ts` and `customer.controller.route.test.ts`.
+
 ## UI / manual
 
 - [x] Add a customer with name and a `+880` phone, then confirm they appear in the list and the notice reads that they were added → AC-1
@@ -44,7 +46,7 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 
 The following acceptance criteria are verified at the backend level through 245 integration tests:
 
-- **AC-8, AC-9, AC-10**: Archive, restore, and transaction tests run against a MongoDB replica set and verify:
+- **AC-8, AC-9, AC-10**: Archive, restore, and transaction tests run against a real PostgreSQL test database and verify:
   - Archive hides customer from search and blocks edits
   - Restore clears `archivedAt` and returns to search
   - One audit entry per transition, atomic with state change

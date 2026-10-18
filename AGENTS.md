@@ -4,7 +4,7 @@
 
 - **Language and runtime**: TypeScript, Node.js
 - **Framework**: Next.js app router, Express
-- **Key dependencies**: MongoDB with Mongoose, JWT authentication, BullMQ with Redis, Cloudinary
+- **Key dependencies**: PostgreSQL with Drizzle ORM, JWT authentication, BullMQ with Redis, Cloudinary
 - **Package manager**: npm 10 with npm workspaces
 
 ## Build approach
@@ -76,7 +76,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title.md`.
 - [web-design-guidelines](.agents/skills/web-design-guidelines/): `vercel-labs/agent-skills`, web design and accessibility guidance.
 - [writing-guidelines](.agents/skills/writing-guidelines/): `vercel-labs/agent-skills`, clear writing guidance.
 
-MCP servers: `mongodb-js/mongodb-mcp-server` (recommended), `https://mcp.vercel.com` (recommended), `@modelcontextprotocol/server-git` (recommended)
+MCP servers: `@modelcontextprotocol/server-postgres` (recommended), `https://mcp.vercel.com` (recommended), `@modelcontextprotocol/server-git` (recommended)
 
 ## Context files
 

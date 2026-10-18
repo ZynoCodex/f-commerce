@@ -26,6 +26,7 @@
     "@playwright/test": "^1.63.0",
     "@types/multer": "^2.2.0",
     "concurrently": "^9.2.1",
+    "drizzle-orm": "^0.44.0",
     "eslint": "^9.35.0",
     "prettier": "^3.6.2",
     "typescript-eslint": "^8.42.0"

@@ -1,5 +1,7 @@
 # 0005 · Customer records: decision record
 
+> **Note (2026-10-18)**: Mongoose-specific guidance below is historical. The version guard, the cursor paging and the archive/restore transaction are implemented with Drizzle over PostgreSQL (`backend/src/infrastructure/database/drizzle/repositories/customer.repository.ts`), where the version filter is an ordinary conditional `UPDATE ... WHERE version = expected` instead of `findOneAndUpdate` plus `__v`. Case-insensitive name search and sort use the `lower(name)` expression index rather than a collation. The reasoning about explicit integer versions and single-transaction audit writes still applies.
+
 ## Context
 
 Sellers in this app take most orders from chat and social channels, and repeat buyers make up much of the revenue. Right now nothing ties a buyer to their earlier orders, so a seller cannot see who owes money or what a buyer is worth. Orders in row 9 need a customer to attach to, so this record has to exist first.

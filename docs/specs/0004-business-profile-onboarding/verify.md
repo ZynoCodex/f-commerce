@@ -2,6 +2,8 @@
 
 _Steps derived from spec 0004 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
+> **Note (2026-10-18)**: The results below were recorded against the MongoDB backend. The store is now PostgreSQL 18 with Drizzle ORM, so a re-run needs `DATABASE_URL` pointing at Postgres and the migrations applied (`npm run db:migrate --workspace @f-commerce/backend`). The endpoint behaviour and payloads are unchanged; the logged reports that mention `MONGODB_URI` defaults are historical.
+
 ## UI / manual
 
 **Fixes applied since first verify pass:**

@@ -4,6 +4,8 @@
  * cursor cannot be replayed against a different query or page size.
  */
 
+import { isUuid } from './uuid.js';
+
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 
@@ -51,7 +53,7 @@ export function decodeCustomerCursor(
   const parsed = decode(raw);
   if (!parsed) return null;
   const { name, _id, q, limit: cursorLimit } = parsed;
-  if (typeof name !== 'string' || typeof _id !== 'string') return null;
+  if (typeof name !== 'string' || typeof _id !== 'string' || !isUuid(_id)) return null;
   if (typeof q !== 'string' || typeof cursorLimit !== 'number') return null;
   if (q !== query || cursorLimit !== limit) return null;
   return { name, id: _id, q, limit: cursorLimit };
@@ -79,7 +81,7 @@ export function decodeOrderCursor(raw: string, limit: number): OrderCursorPayloa
   const parsed = decode(raw);
   if (!parsed) return null;
   const { createdAt, _id, limit: cursorLimit } = parsed;
-  if (typeof createdAt !== 'string' || typeof _id !== 'string') return null;
+  if (typeof createdAt !== 'string' || typeof _id !== 'string' || !isUuid(_id)) return null;
   if (typeof cursorLimit !== 'number' || cursorLimit !== limit) return null;
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return null;

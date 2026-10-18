@@ -32,8 +32,8 @@ vi.mock('../../application/services/business.service.js', () => ({
 // Mock Cloudinary service
 vi.mock('../../infrastructure/services/cloudinary.service.js');
 
-// Mock the Mongoose repository
-vi.mock('../../infrastructure/database/mongoose/repositories/business.repository.js');
+// Mock the Drizzle repository
+vi.mock('../../infrastructure/database/drizzle/repositories/business.repository.js');
 
 // Mock the auth middleware to inject a controlled user + bypass token verification
 vi.mock('../middlewares/auth.middleware.js', () => ({
@@ -52,7 +52,7 @@ vi.mock('../middlewares/auth.middleware.js', () => ({
 // Mock runWithContext to establish context and await async callbacks.
 // The real runWithContext establishes AsyncLocalStorage context; for tests
 // we need the async callback to fully resolve before Express proceeds.
-vi.mock('../../infrastructure/database/mongoose/context.js', () => ({
+vi.mock('../../infrastructure/database/drizzle/context.js', () => ({
   runWithContext: vi.fn((_ctx, fn) => fn()),
   getTenantId: vi.fn(() => 'biz-target'),
 }));
@@ -585,7 +585,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
     expect(saveDraftMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when field is a MongoDB operator (NoSQL injection protection)', async () => {
+  it('returns 400 when field is not an allowed draft field (injection protection)', async () => {
     const res = await request(app)
       .put('/api/business/onboarding/draft')
       .set('x-business-id', 'biz-target')

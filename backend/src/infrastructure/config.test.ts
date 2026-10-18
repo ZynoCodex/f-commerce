@@ -9,7 +9,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   PORT: z.string().default('4000'),
-  MONGODB_URI: z.string().url().default('mongodb://localhost:27017/f-commerce'),
+  DATABASE_URL: z
+    .string()
+    .url()
+    .default('postgresql://fcommerce:fcommerce@localhost:5432/fcommerce'),
   JWT_SECRET: z.string().min(32).default('super-secret-jwt-key-replace-in-production'),
   JWT_REFRESH_SECRET: z
     .string()
@@ -28,7 +31,7 @@ describe('config env schema', () => {
     it('parses when all required vars are provided and valid', () => {
       const result = envSchema.safeParse({
         PORT: '4000',
-        MONGODB_URI: 'mongodb://localhost:27017/test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
       });
@@ -36,7 +39,7 @@ describe('config env schema', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.PORT).toBe('4000');
-        expect(result.data.MONGODB_URI).toBe('mongodb://localhost:27017/test');
+        expect(result.data.DATABASE_URL).toBe('postgresql://localhost:5432/test');
         expect(result.data.JWT_SECRET).toHaveLength(32);
       }
     });
@@ -44,7 +47,7 @@ describe('config env schema', () => {
     it('fills defaults for optional Cloudinary vars when omitted', () => {
       const result = envSchema.safeParse({
         PORT: '4000',
-        MONGODB_URI: 'mongodb://localhost:27017/test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
       });
@@ -62,7 +65,7 @@ describe('config env schema', () => {
     it('allows overriding CORS_ORIGINS to a comma-separated list', () => {
       const result = envSchema.safeParse({
         PORT: '4000',
-        MONGODB_URI: 'mongodb://localhost:27017/test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
         CORS_ORIGINS: 'http://localhost:3000,http://localhost:3001',
@@ -77,7 +80,7 @@ describe('config env schema', () => {
     it('allows optional OAuth fields when set', () => {
       const result = envSchema.safeParse({
         PORT: '4000',
-        MONGODB_URI: 'mongodb://localhost:27017/test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
         OAUTH_GOOGLE_CLIENT_ID: 'google-client-id',
@@ -91,16 +94,16 @@ describe('config env schema', () => {
   });
 
   describe('invalid inputs', () => {
-    it('rejects when MONGODB_URI is not a valid URL', () => {
+    it('rejects when DATABASE_URL is not a valid URL', () => {
       const result = envSchema.safeParse({
-        MONGODB_URI: 'not-a-url',
+        DATABASE_URL: 'not-a-url',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues.some((i) => i.path.includes('MONGODB_URI'))).toBe(true);
+        expect(result.error.issues.some((i) => i.path.includes('DATABASE_URL'))).toBe(true);
       }
     });
 
@@ -124,7 +127,7 @@ describe('config env schema', () => {
 
     it('rejects when PORT is not provided but defaults apply correctly when absent', () => {
       const result = envSchema.safeParse({
-        MONGODB_URI: 'mongodb://localhost:27017/test',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
         JWT_SECRET: 'a'.repeat(32),
         JWT_REFRESH_SECRET: 'b'.repeat(32),
       });

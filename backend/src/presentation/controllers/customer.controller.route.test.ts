@@ -1,27 +1,30 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
-import type { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { eq, and, sql } from 'drizzle-orm';
 import { customerRouter } from './customer.controller.js';
 import { config } from '../../infrastructure/config.js';
-import { runWithContext } from '../../infrastructure/database/mongoose/context.js';
-import { CustomerModel } from '../../infrastructure/database/mongoose/models/Customer.js';
-import { OrderModel } from '../../infrastructure/database/mongoose/models/Order.js';
-import { AuditLogModel } from '../../infrastructure/database/mongoose/models/AuditLog.js';
+import { getDb } from '../../infrastructure/database/drizzle/client.js';
+import { runWithContext } from '../../infrastructure/database/drizzle/context.js';
+import {
+  businesses,
+  customers,
+  orders,
+  auditLogs,
+} from '../../infrastructure/database/drizzle/schema.js';
 import { OrderStatus } from '../../domain/entities/order.entity.js';
-import { startReplSet, stopReplSet, resetDatabase } from '../../test-support/mongo-replset.js';
+import { startPg, stopPg, resetDatabase } from '../../test-support/pg-test-database.js';
 
 const app = express();
 app.use(express.json());
 app.use('/api/customers', customerRouter);
 
-const BIZ = new mongoose.Types.ObjectId().toString();
-const OTHER_BIZ = new mongoose.Types.ObjectId().toString();
-const OWNER = new mongoose.Types.ObjectId().toString();
-const STAFF = new mongoose.Types.ObjectId().toString();
-const OUTSIDER = new mongoose.Types.ObjectId().toString();
+const BIZ = '00000000-0000-0000-0000-0000000000a1';
+const OTHER_BIZ = '00000000-0000-0000-0000-0000000000b2';
+const OWNER = '00000000-0000-0000-0000-0000000000c3';
+const STAFF = '00000000-0000-0000-0000-0000000000d4';
+const OUTSIDER = '00000000-0000-0000-0000-0000000000e5';
 
 function tokenFor(
   userId: string,
@@ -33,6 +36,9 @@ function tokenFor(
 const OWNER_TOKEN = tokenFor(OWNER, [{ businessId: BIZ, role: 'OWNER' }]);
 const STAFF_TOKEN = tokenFor(STAFF, [{ businessId: BIZ, role: 'STAFF' }]);
 const OUTSIDER_TOKEN = tokenFor(OUTSIDER, [{ businessId: OTHER_BIZ, role: 'OWNER' }]);
+
+/** The audit table only accepts UUID user ids, so this actor cannot be recorded. */
+const BROKEN_AUDIT_TOKEN = tokenFor('not-a-uuid', [{ businessId: BIZ, role: 'OWNER' }]);
 
 function as(token: string, businessId = BIZ) {
   return { authorization: `Bearer ${token}`, 'x-business-id': businessId };
@@ -55,6 +61,13 @@ function inBiz<T>(businessId: string, fn: () => Promise<T>): Promise<T> {
   return runWithContext({ userId: OWNER, businessId, role: 'OWNER' }, async () => await fn());
 }
 
+/** Insert the tenant row every scoped entity references. */
+async function seedBusiness(businessId: string): Promise<void> {
+  await getDb()
+    .insert(businesses)
+    .values({ id: businessId, name: `Business ${businessId}` });
+}
+
 async function seedOrder(
   customerId: string,
   fields: {
@@ -66,50 +79,73 @@ async function seedOrder(
   },
 ): Promise<void> {
   await inBiz(BIZ, async () => {
-    const doc = await OrderModel.create({
-      businessId: new mongoose.Types.ObjectId(BIZ),
-      customerId: new mongoose.Types.ObjectId(customerId),
-      orderNumber: fields.orderNumber,
-      status: fields.status ?? OrderStatus.PENDING,
-      subtotal: fields.total,
-      deliveryFee: 0,
-      discount: 0,
-      total: fields.total,
-      paidAmount: fields.total - fields.dueAmount,
-      dueAmount: fields.dueAmount,
-    });
+    const db = getDb();
+    const result = await db
+      .insert(orders)
+      .values({
+        businessId: BIZ,
+        customerId,
+        orderNumber: fields.orderNumber,
+        status: fields.status ?? OrderStatus.PENDING,
+        subtotal: fields.total,
+        deliveryFee: 0,
+        discount: 0,
+        total: fields.total,
+        paidAmount: fields.total - fields.dueAmount,
+        dueAmount: fields.dueAmount,
+      })
+      .returning({ id: orders.id });
     if (fields.createdAt) {
-      await OrderModel.collection.updateOne(
-        { _id: doc._id },
-        { $set: { createdAt: fields.createdAt } },
-      );
+      await db
+        .update(orders)
+        .set({ createdAt: fields.createdAt })
+        .where(eq(orders.id, result[0].id));
     }
   });
 }
 
-async function auditCount(entityId: string, action?: string): Promise<number> {
-  return inBiz(BIZ, () =>
-    AuditLogModel.countDocuments(action ? { entityId, action } : { entityId }),
-  );
+async function countCustomers(where: Parameters<typeof and>[number]): Promise<number> {
+  return inBiz(BIZ, async () => {
+    const result = await getDb()
+      .select({ count: sql`count(*)` })
+      .from(customers)
+      .where(and(eq(customers.businessId, BIZ), where));
+    return Number(result[0]?.count ?? 0);
+  });
 }
 
-describe('customer routes against a replica set', () => {
-  let replSet: MongoMemoryReplSet;
+async function findCustomer(id: string): Promise<typeof customers.$inferSelect | undefined> {
+  return inBiz(BIZ, async () => {
+    const result = await getDb().select().from(customers).where(eq(customers.id, id));
+    return result[0];
+  });
+}
 
+async function auditCount(entityId: string, action?: string): Promise<number> {
+  return inBiz(BIZ, async () => {
+    const conditions = [eq(auditLogs.businessId, BIZ), eq(auditLogs.entityId, entityId)];
+    if (action !== undefined) conditions.push(eq(auditLogs.action, action));
+    const result = await getDb()
+      .select({ count: sql`count(*)` })
+      .from(auditLogs)
+      .where(and(...conditions));
+    return Number(result[0]?.count ?? 0);
+  });
+}
+
+describe('customer routes against PostgreSQL', () => {
   beforeAll(async () => {
-    replSet = await startReplSet();
-  }, 120_000);
+    await startPg();
+  }, 60_000);
 
   afterAll(async () => {
-    await stopReplSet(replSet);
-  }, 120_000);
+    await stopPg();
+  }, 60_000);
 
   beforeEach(async () => {
     await resetDatabase();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    await seedBusiness(BIZ);
+    await seedBusiness(OTHER_BIZ);
   });
 
   describe('happy path (AC-1, AC-4, AC-5, AC-6, AC-7)', () => {
@@ -195,7 +231,7 @@ describe('customer routes against a replica set', () => {
       expect(first.status).toBe(200);
       expect(second.status).toBe(409);
       expect(second.body.error).toBe('CUSTOMER_CHANGED');
-      const stored = await inBiz(BIZ, () => CustomerModel.findById(id).lean());
+      const stored = await findCustomer(id);
       expect(stored?.name).toBe('Rahim Uddin');
       expect(stored?.version).toBe(2);
     });
@@ -228,7 +264,7 @@ describe('customer routes against a replica set', () => {
         existingCustomerId: existingId,
         archived: false,
       });
-      expect(await inBiz(BIZ, () => CustomerModel.countDocuments({ phone }))).toBe(1);
+      expect(await countCustomers(eq(customers.phone, phone))).toBe(1);
     });
 
     it('flags the duplicate as archived when the existing customer is archived', async () => {
@@ -257,7 +293,7 @@ describe('customer routes against a replica set', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({ error: 'VALIDATION_ERROR', fields: ['phone'] });
-      expect(await inBiz(BIZ, () => CustomerModel.countDocuments({}))).toBe(0);
+      expect(await countCustomers(sql`true`)).toBe(0);
     });
 
     it('accepts a phone written with Bengali digits and stores the ASCII form', async () => {
@@ -328,16 +364,17 @@ describe('customer routes against a replica set', () => {
     it('returns 500 and commits neither the archive nor its audit entry when the audit write fails', async () => {
       const created = await createViaApi({ name: 'Rahim' });
       const id: string = created.body.data.id;
-      vi.spyOn(AuditLogModel, 'create').mockRejectedValueOnce(new Error('audit store down'));
 
+      // The audit row is written in the same transaction as the archive, so a
+      // rejected actor id must leave the customer untouched.
       const response = await request(app)
         .post(`/api/customers/${id}/archive`)
-        .set(as(OWNER_TOKEN))
+        .set(as(BROKEN_AUDIT_TOKEN))
         .send({ version: 1 });
 
       expect(response.status).toBe(500);
-      const stored = await inBiz(BIZ, () => CustomerModel.findById(id).lean());
-      expect(stored?.archivedAt).toBeUndefined();
+      const stored = await findCustomer(id);
+      expect(stored?.archivedAt).toBeNull();
       expect(stored?.version).toBe(1);
       expect(await auditCount(id)).toBe(0);
     });
@@ -382,7 +419,7 @@ describe('customer routes against a replica set', () => {
         .send({ name: 'Rahim', phone: nextPhone() });
 
       expect(response.status).toBe(403);
-      expect(await inBiz(BIZ, () => CustomerModel.countDocuments({}))).toBe(0);
+      expect(await countCustomers(sql`true`)).toBe(0);
     });
 
     it('returns 401 when no bearer token is sent', async () => {
@@ -392,20 +429,22 @@ describe('customer routes against a replica set', () => {
     });
 
     it('returns 404 for a customer id that belongs to another business', async () => {
-      const otherCustomer = await inBiz(OTHER_BIZ, () =>
-        CustomerModel.create({
-          businessId: new mongoose.Types.ObjectId(OTHER_BIZ),
-          name: 'Other',
-          phone: nextPhone(),
-          version: 1,
-        }),
-      );
+      const otherId = await inBiz(OTHER_BIZ, async () => {
+        const result = await getDb()
+          .insert(customers)
+          .values({
+            businessId: OTHER_BIZ,
+            name: 'Other',
+            phone: nextPhone(),
+            version: 1,
+          })
+          .returning({ id: customers.id });
+        return result[0].id;
+      });
 
-      const profile = await request(app)
-        .get(`/api/customers/${otherCustomer._id.toString()}`)
-        .set(as(OWNER_TOKEN));
+      const profile = await request(app).get(`/api/customers/${otherId}`).set(as(OWNER_TOKEN));
       const orders = await request(app)
-        .get(`/api/customers/${otherCustomer._id.toString()}/orders`)
+        .get(`/api/customers/${otherId}/orders`)
         .set(as(OWNER_TOKEN));
 
       expect(profile.status).toBe(404);
@@ -422,7 +461,7 @@ describe('customer routes against a replica set', () => {
 
     it('returns 404 for an unknown customer id on the archive route', async () => {
       const response = await request(app)
-        .post(`/api/customers/${new mongoose.Types.ObjectId().toString()}/archive`)
+        .post('/api/customers/00000000-0000-0000-0000-00000000ffff/archive')
         .set(as(OWNER_TOKEN))
         .send({ version: 1 });
 

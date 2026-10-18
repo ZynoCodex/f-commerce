@@ -3,6 +3,8 @@
 **Date**: 2026-09-22
 **Status**: Accepted
 
+> **Note (2026-10-18)**: The store is PostgreSQL 18 with Drizzle ORM. The `currency`, `logoUrl`, `address` and `onboardingComplete` fields live on the `businesses` table in `backend/src/infrastructure/database/drizzle/schema.ts`, and the onboarding draft is a nullable `onboarding_draft` jsonb column that `saveDraft` merges one field at a time. Steps and references below that name a Mongoose model or `BaseSchema.ts` are historical; the `business.repository.integration.test.ts` suite covers the same behaviour against Postgres. The onboarding gate still reads the business through the repository and is covered by `business.controller.route.test.ts`.
+
 ## Summary
 
 This design adds a business onboarding step that runs after registration so the seller can complete their business profile, upload a logo, and choose a currency before entering the app. The existing Business entity gets new fields for currency, logo, structured address, and an onboarding completion flag. The app gate redirects incomplete businesses to the onboarding wizard.

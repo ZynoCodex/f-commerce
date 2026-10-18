@@ -33,14 +33,20 @@ const EXCLUDED_SPEND_STATUSES = [OrderStatus.CANCELLED, OrderStatus.RETURNED];
 
 const AUDIT_ENTITY_TYPE = 'CUSTOMER';
 
-const DUPLICATE_KEY_CODE = 11000;
+const DUPLICATE_KEY_CODES = new Set([11000, '23505']);
 
+/**
+ * Drizzle wraps driver errors, so the PostgreSQL code sits on the cause chain
+ * rather than on the error the caller catches.
+ */
 function isDuplicateKeyError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: number }).code === DUPLICATE_KEY_CODE
-  );
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (DUPLICATE_KEY_CODES.has(code as number | string)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function toDto(customer: Customer) {

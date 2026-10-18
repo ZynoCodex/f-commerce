@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../infrastructure/config.js';
-import { runWithContext } from '../../infrastructure/database/mongoose/context.js';
+import { runWithContext } from '../../infrastructure/database/drizzle/context.js';
 
 interface JwtPayload {
   userId: string;
@@ -68,7 +68,7 @@ export function requireBusinessRole(allowedRoles: ('OWNER' | 'STAFF')[]) {
       return;
     }
 
-    // Set the context for Mongoose tenant plugin
+    // Set the tenant context carried through AsyncLocalStorage
     runWithContext({ userId: user.userId, businessId, role: membership.role }, () => {
       next();
     });

@@ -4,7 +4,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   PORT: z.string().default('4000'),
-  MONGODB_URI: z.string().url().default('mongodb://localhost:27017/f-commerce'),
+  DATABASE_URL: z
+    .string()
+    .url()
+    .default('postgresql://fcommerce:fcommerce@localhost:5432/fcommerce'),
   JWT_SECRET: z.string().min(32).default('super-secret-jwt-key-replace-in-production'),
   JWT_REFRESH_SECRET: z
     .string()

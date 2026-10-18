@@ -1,7 +1,9 @@
 # 0002. Design the data model
 
 **Date**: 2026-09-08
-**Status**: Proposed
+**Status**: Accepted
+
+> **Note (2026-10-18)**: Implemented in PostgreSQL with Drizzle ORM. Collections became tables, `ObjectId` references became `uuid` foreign keys, tenant filters are explicit in each repository, and product variants are a normalized `product_variants` table instead of an embedded array. `backend/src/infrastructure/database/drizzle/schema.ts` is the current source of truth; the collection sketches below are kept for history.
 
 ## Summary
 
@@ -110,14 +112,14 @@ The tradeoff is operational complexity - more collections to manage and query co
 
 ## Proposed stack
 
-| Layer           | Choice                       | Reason                                                                                 |
-| --------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
-| Primary DB      | MongoDB + Mongoose           | Chosen by stack spec; perfect for flexible schemas and tenant isolation.               |
-| Auth            | JWT with custom endpoints    | Chosen by stack spec; provides fine-grained control for multi-tenant access.           |
-| Background jobs | BullMQ + Redis               | Chosen by stack spec; handles async operations like order processing and email.        |
-| File storage    | Cloudinary                   | Chosen by stack spec; provides scalable image storage for products and business logos. |
-| Hosting         | Vercel + Render              | Chosen by stack spec; Vercel for frontend, Render for Node.js backend.                 |
-| Observability   | Winston + structured logging | Chosen by stack spec; provides structured logs for debugging.                          |
+| Layer           | Choice                       | Reason                                                                                                             |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Primary DB      | PostgreSQL 18 + Drizzle ORM  | Chosen by stack spec; relational integrity with foreign keys, partial unique indexes, and explicit tenant filters. |
+| Auth            | JWT with custom endpoints    | Chosen by stack spec; provides fine-grained control for multi-tenant access.                                       |
+| Background jobs | BullMQ + Redis               | Chosen by stack spec; handles async operations like order processing and email.                                    |
+| File storage    | Cloudinary                   | Chosen by stack spec; provides scalable image storage for products and business logos.                             |
+| Hosting         | Vercel + Render              | Chosen by stack spec; Vercel for frontend, Render for Node.js backend.                                             |
+| Observability   | Winston + structured logging | Chosen by stack spec; provides structured logs for debugging.                                                      |
 
 ## Consequences
 
