@@ -10,26 +10,26 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## At a glance
 
-| #   | Feature                           | Phase      | Status  |
-| --- | --------------------------------- | ---------- | ------- |
-| 1   | Stack & architecture              | Foundation | done    |
-| 2   | Data model                        | Foundation | done    |
-| 3   | Coding standards & tooling        | Foundation | done    |
-| 4   | Design system & UI foundation     | Foundation | done    |
-| 5   | Authentication & tenant isolation | Slice 1    | done    |
-| 6   | Business profile & onboarding     | Slice 1    | done    |
-| 7   | Customers                         | Slice 1    | done    |
-| 8   | Products & categories             | Slice 2    | planned |
-| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned |
-| 10  | Payments                          | Slice 2    | planned |
-| 11  | Inventory management              | Slice 3    | planned |
-| 12  | Delivery & shipping               | Slice 3    | planned |
-| 13  | Expenses & profit calculation     | Slice 3    | planned |
-| 14  | Dashboard                         | Slice 3    | planned |
-| 15  | Reports                           | Slice 4    | planned |
-| 16  | Search & filters                  | Slice 4    | planned |
-| 17  | Notifications                     | Slice 4    | planned |
-| 18  | Invoice generation                | Slice 4    | planned |
+| #   | Feature                           | Phase      | Status      |
+| --- | --------------------------------- | ---------- | ----------- |
+| 1   | Stack & architecture              | Foundation | done        |
+| 2   | Data model                        | Foundation | done        |
+| 3   | Coding standards & tooling        | Foundation | done        |
+| 4   | Design system & UI foundation     | Foundation | done        |
+| 5   | Authentication & tenant isolation | Slice 1    | done        |
+| 6   | Business profile & onboarding     | Slice 1    | done        |
+| 7   | Customers                         | Slice 1    | done        |
+| 8   | Products & categories             | Slice 2    | in-progress |
+| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned     |
+| 10  | Payments                          | Slice 2    | planned     |
+| 11  | Inventory management              | Slice 3    | planned     |
+| 12  | Delivery & shipping               | Slice 3    | planned     |
+| 13  | Expenses & profit calculation     | Slice 3    | planned     |
+| 14  | Dashboard                         | Slice 3    | planned     |
+| 15  | Reports                           | Slice 4    | planned     |
+| 16  | Search & filters                  | Slice 4    | planned     |
+| 17  | Notifications                     | Slice 4    | planned     |
+| 18  | Invoice generation                | Slice 4    | planned     |
 
 ## Foundations
 
@@ -57,7 +57,7 @@ Core entities: users, businesses, customers, products, categories, orders, order
 
 - [x] Design it (spec): `/architect data model`
 - [x] Build it: `/develop data model`
-      Spec 0002 · code in `backend/src/domain/entities` and `backend/src/infrastructure/database/mongoose/models`
+      Spec 0002 · code in `backend/src/domain/entities` and `backend/src/infrastructure/database/drizzle/schema.ts`
 - [x] Verify it: `/check verify data model`
 - [x] Test it: `/test data model`
 - [x] Review it (fresh model): `/check review data model`
@@ -138,12 +138,22 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
 
 ## Slice 2: Product & Order Workflow
 
-### 8. Products & categories · needs a decision
+### 8. Products & categories · in-progress
 
 Product CRUD with images, SKU, stock tracking, categories, low-stock thresholds, archive.
 **Done when:** user can add products with variants, see stock status (in stock/low/out), and archive them.
 
-- [ ] Design it (spec): `/architect products`
+- [x] Design it (spec): `/architect products`
+      Spec [0006](../specs/0006-products-categories-variants.md)
+- [ ] Build it: `/develop products`
+  - [ ] Data, contracts and category foundation with indexes and backfill (AC-1, AC-3, AC-4, AC-8, AC-12, AC-14)
+  - [ ] Product create, list and search with derived stock, filters and cursor paging (AC-1, AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-13)
+  - [ ] Images, edits, archive, restore and hard delete with version and audit transactions (AC-5, AC-9, AC-10, AC-11, AC-14)
+  - [ ] Tenant guards, timeout handling and catalog screens for list, detail and variants (AC-6, AC-9, AC-10, AC-11, AC-12, AC-13, AC-15, AC-16)
+- [ ] Verify it: `/check verify products`
+- [ ] Test it: `/test products`
+- [ ] Review it (fresh model): `/check review products`
+- [ ] Document it: `/document products`
 
 ### 9. Orders (CRUD + status workflow) · needs a decision
 
