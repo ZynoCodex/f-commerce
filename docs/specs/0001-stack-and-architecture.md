@@ -3,6 +3,8 @@
 **Date**: 2026-09-08
 **Status**: In Progress
 
+> **Note (2026-10-18)**: The database layer moved from MongoDB + Mongoose to PostgreSQL 18 + Drizzle ORM. `DATABASE_URL` replaces `MONGODB_URI`, the JWT settings in code are `JWT_SECRET` and `JWT_REFRESH_SECRET` (the `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, and `JWT_REFRESH_TTL` names are retired; access tokens last 15 minutes and refresh tokens 7 days, fixed in code), `docker-compose.yml` runs `postgres` and `redis` (no replica set), and the Mongoose models under `backend/src/infrastructure/database/mongoose/` were deleted. `backend/src/infrastructure/database/drizzle/schema.ts` is the current source of truth for the data model. MongoDB statements below describe the original decision and are kept for history.
+
 ## Summary
 
 The project will use one repository with separate frontend and backend workspaces. The Next.js app will deploy to Vercel and the Express API will deploy to Render, so deployment boundaries stay clear while local development and shared TypeScript contracts stay simple. MongoDB with Mongoose, JWT authentication, BullMQ with Redis, and Cloudinary remain the chosen service foundation.

@@ -7,7 +7,8 @@ export enum UserRole {
 
 export interface User extends BaseEntity {
   email: string;
-  passwordHash: string;
+  /** Absent for accounts that only sign in through an OAuth provider. */
+  passwordHash?: string;
   name: string;
   oauth: { provider: string; providerId: string }[];
   isActive: boolean;

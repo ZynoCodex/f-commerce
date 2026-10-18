@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 // E2E for the onboarding + settings flow (spec 0004).
-// Requires the dev stack: backend on :4000, frontend on :3000, MongoDB running.
+// Requires the dev stack: backend on :4000, frontend on :3000, PostgreSQL running.
 // Covers AC-1, AC-3, AC-4, AC-5. Run with: npm run e2e --workspace @f-commerce/frontend
 
 test.use({ baseURL: 'http://localhost:3000' });

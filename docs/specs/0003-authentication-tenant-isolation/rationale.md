@@ -1,3 +1,5 @@
+> **Note (2026-10-18)**: The mechanism below changed. Tenant isolation no longer uses a global Mongoose plugin: the request's `businessId` still travels in `AsyncLocalStorage` (`backend/src/infrastructure/database/drizzle/context.ts`), but each Drizzle repository filters on it explicitly. The rest of this record explains why isolation was enforced in one place rather than per call site; that intent still holds through the repository layer. See the note at the top of `index.md`.
+
 ## Context
 
 The F-commerce SaaS platform manages critical business data (orders, inventory, customers) for multiple independent businesses. A user must be able to securely sign in (via Email+Password or OAuth) and act on behalf of a business. Crucially, a user acting in one business context must absolutely not be able to read or modify data belonging to another business. Without a bulletproof isolation mechanism, cross-tenant data leaks are possible.

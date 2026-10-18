@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 // E2E for the customer records flow (spec 0005).
-// Requires the dev stack: backend on :4000, frontend on :3000, MongoDB replica set running.
+// Requires the dev stack: backend on :4000, frontend on :3000, PostgreSQL running.
 // Run with: npm run e2e --workspace @f-commerce/frontend
 
 test.use({ baseURL: 'http://localhost:3000' });

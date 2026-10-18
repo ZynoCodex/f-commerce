@@ -2,7 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from './infrastructure/config.js';
-import { connectToDatabase } from './infrastructure/database/mongoose/connection.js';
+import { verifyDatabaseConnection } from './infrastructure/database/drizzle/client.js';
 import { authRouter } from './presentation/controllers/auth.controller.js';
 import { businessRouter } from './presentation/controllers/business.controller.js';
 import { customerRouter } from './presentation/controllers/customer.controller.js';
@@ -38,7 +38,7 @@ async function startServer() {
   });
 
   try {
-    await connectToDatabase(config.MONGODB_URI);
+    await verifyDatabaseConnection();
     console.log('Database connected successfully');
   } catch (error) {
     console.error('Failed to connect to database:', error);

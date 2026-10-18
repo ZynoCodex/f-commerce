@@ -3,6 +3,8 @@
 **Date**: 2026-10-14
 **Status**: done
 
+> **Note (2026-10-18)**: Archive and restore still commit the state change and exactly one audit entry together, now as a PostgreSQL transaction through Drizzle. Local development and CI no longer need a MongoDB replica set: `docker-compose.yml` runs PostgreSQL 18 and `.github/workflows/ci.yml` starts a `postgres:18` container and applies `backend/drizzle/migrations` before the backend starts. Route and repository tests run against a real PostgreSQL database (`src/test-support/pg-test-database.ts`).
+
 ## Summary
 
 Each buyer gets one customer record in the business, found by name or phone, and their profile shows their orders and total spend. Phone numbers must include the country code and can belong to only one customer in the business. Customers are archived instead of deleted, so their orders stay linked and they can come back later, and every archive and restore is written to an audit log.

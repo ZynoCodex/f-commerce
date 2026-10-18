@@ -2,9 +2,9 @@ import { Request, Response, Router } from 'express';
 import { CustomerCreateSchema, CustomerUpdateSchema } from '@f-commerce/contracts';
 import { CustomerService } from '../../application/services/customer.service.js';
 import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware.js';
-import { MongooseCustomerRepository } from '../../infrastructure/database/mongoose/repositories/customer.repository.js';
-import { MongooseBusinessRepository } from '../../infrastructure/database/mongoose/repositories/business.repository.js';
-import { getTenantId, requestContext } from '../../infrastructure/database/mongoose/context.js';
+import { DrizzleCustomerRepository } from '../../infrastructure/database/drizzle/repositories/customer.repository.js';
+import { DrizzleBusinessRepository } from '../../infrastructure/database/drizzle/repositories/business.repository.js';
+import { getTenantId, requestContext } from '../../infrastructure/database/drizzle/context.js';
 import {
   CustomerArchivedError,
   CustomerChangedError,
@@ -18,8 +18,8 @@ import {
 
 export const customerRouter = Router();
 
-const customerService = new CustomerService(new MongooseCustomerRepository());
-const businessRepository = new MongooseBusinessRepository();
+const customerService = new CustomerService(new DrizzleCustomerRepository());
+const businessRepository = new DrizzleBusinessRepository();
 
 const ALLOWED_ROLES: ('OWNER' | 'STAFF')[] = ['OWNER', 'STAFF'];
 

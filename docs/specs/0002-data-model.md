@@ -3,6 +3,8 @@
 **Date**: 2026-09-08
 **Status**: Proposed
 
+> **Note (2026-10-18)**: Implemented in PostgreSQL with Drizzle ORM. Collections became tables, `ObjectId` references became `uuid` foreign keys, tenant filters are explicit in each repository, and product variants are a normalized `product_variants` table instead of an embedded array. `backend/src/infrastructure/database/drizzle/schema.ts` is the current source of truth; the collection sketches below are kept for history.
+
 ## Summary
 
 The data model uses separate MongoDB collections with strict business (tenant) isolation and historical pricing snapshots. It supports the full order lifecycle from creation through delivery and profit calculation. Each business owns its data, and queries automatically filter by `businessId`.

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { requireAuth, requireBusinessRole } from './auth.middleware.js';
 import jwt from 'jsonwebtoken';
-import { runWithContext } from '../../infrastructure/database/mongoose/context.js';
+import { runWithContext } from '../../infrastructure/database/drizzle/context.js';
 import { Request, Response, NextFunction } from 'express';
 
 vi.mock('jsonwebtoken');
-vi.mock('../../infrastructure/database/mongoose/context.js');
+vi.mock('../../infrastructure/database/drizzle/context.js');
 
 describe('Auth Middleware', () => {
   let req: Partial<Request>;

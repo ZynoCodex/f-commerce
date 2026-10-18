@@ -8,7 +8,7 @@ import {
   OAuthLoginSchema,
   InviteStaffSchema,
 } from '@f-commerce/contracts';
-import { MongooseAuthRepository } from '../../infrastructure/database/mongoose/repositories/auth.repository.js';
+import { DrizzleAuthRepository } from '../../infrastructure/database/drizzle/repositories/auth.repository.js';
 import {
   DuplicateEmailError,
   UnauthorizedError,
@@ -19,7 +19,7 @@ import {
 export const authRouter = Router();
 
 // Instantiate repository and service (simple DI for now)
-const authRepository = new MongooseAuthRepository();
+const authRepository = new DrizzleAuthRepository();
 const authService = new AuthService(authRepository);
 
 authRouter.post(

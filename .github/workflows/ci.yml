@@ -12,17 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Archive and restore commit the record change and its audit entry in one
-      # MongoDB transaction (spec 0005), so the database must run as a replica
-      # set, exactly like local development in docker-compose.yml. Transactions
-      # are not available on a standalone server.
-      - name: Start MongoDB as a single node replica set
+      # PostgreSQL transaction (spec 0005), so the tests run against a real
+      # server: transaction rollback, partial indexes, and expression indexes
+      # all have to behave exactly like they do in production.
+      - name: Start PostgreSQL
         run: |
-          docker run -d --name mongo -p 27017:27017 mongo:8 --replSet rs0 --bind_ip_all
-          until docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 }).ok" > /dev/null 2>&1; do
-            sleep 1
-          done
-          docker exec mongo mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] })"
-          until [ "$(docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null)" = "true" ]; do
+          docker run -d --name postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=f-commerce \
+            -p 5432:5432 postgres:18
+          until docker exec postgres pg_isready -U postgres -d f-commerce > /dev/null 2>&1; do
             sleep 1
           done
       - uses: actions/setup-node@v4
@@ -33,15 +33,21 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/f-commerce
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
       - name: Build contracts
         run: npm run build --workspace @f-commerce/contracts
+      - name: Migrate database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/f-commerce
+        run: npm run db:migrate --workspace @f-commerce/backend
       - name: Start backend
         env:
           NODE_ENV: test
           PORT: 4000
-          MONGODB_URI: mongodb://127.0.0.1:27017/f-commerce-e2e
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/f-commerce
           CORS_ORIGINS: http://localhost:3000
         run: npm run dev --workspace @f-commerce/backend > backend.log 2>&1 &
       - name: Wait for backend and database

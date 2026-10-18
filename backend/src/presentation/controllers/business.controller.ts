@@ -2,7 +2,7 @@ import { Request, Response, Router } from 'express';
 import multer from 'multer';
 import { BusinessService } from '../../application/services/business.service.js';
 import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware.js';
-import { MongooseBusinessRepository } from '../../infrastructure/database/mongoose/repositories/business.repository.js';
+import { DrizzleBusinessRepository } from '../../infrastructure/database/drizzle/repositories/business.repository.js';
 import { CloudinaryService } from '../../infrastructure/services/cloudinary.service.js';
 import {
   BusinessProfileSchema,
@@ -10,7 +10,7 @@ import {
   DraftSaveSchema,
 } from '@f-commerce/contracts';
 import { NotFoundError } from '../../domain/errors.js';
-import { getTenantId, runWithContext } from '../../infrastructure/database/mongoose/context.js';
+import { getTenantId, runWithContext } from '../../infrastructure/database/drizzle/context.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -68,7 +68,7 @@ function detectImageType(buffer: Buffer): string | null {
 
 export const businessRouter = Router();
 
-const businessRepository = new MongooseBusinessRepository();
+const businessRepository = new DrizzleBusinessRepository();
 const cloudinaryService = new CloudinaryService();
 const businessService = new BusinessService(businessRepository, cloudinaryService);
 

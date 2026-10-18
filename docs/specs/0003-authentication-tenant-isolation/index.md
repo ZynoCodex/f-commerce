@@ -3,6 +3,8 @@
 **Date**: 2026-09-11
 **Status**: Accepted
 
+> **Note (2026-10-18)**: Tenant isolation no longer uses a global Mongoose plugin. The request's `businessId` still travels through `AsyncLocalStorage` (`drizzle/context.ts`), but each Drizzle repository filters on it explicitly. Repository entry points also reject non-UUID ids, so a malformed id returns 404 instead of a database error.
+
 ## Summary
 
 This design establishes the authentication flow and tenant isolation mechanism for the F-commerce platform. It introduces a `User` identity, an independent `Business` tenant, and a `BusinessMember` mapping collection with role-based access. Multi-tenant isolation is strictly enforced at the database level using a global Mongoose plugin and Node.js `AsyncLocalStorage`.
