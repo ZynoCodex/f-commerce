@@ -16,10 +16,10 @@
   },
   "dependencies": {
     "@f-commerce/contracts": "*",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.6",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.4",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
@@ -41,6 +41,6 @@
     "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.5"
   }
 }
