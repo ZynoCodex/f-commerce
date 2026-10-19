@@ -27,6 +27,7 @@ npm run test       # Vitest unit plus Playwright e2e
 - Use named exports only; no `any` types.
 - Prefer server components for data fetching; stream data to the client.
 - Design system: build all UI to `design.md` (art direction and the maximalist product bar); token values live in CSS.
+- Browser code calls the API through relative `/api/...` paths only. Never hardcode a backend host in client code; the Next.js server proxies `/api/*` to `API_ORIGIN`, and `API_ORIGIN` comes from the environment.
 
 ## Gotchas
 

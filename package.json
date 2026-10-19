@@ -4,9 +4,9 @@
   "private": true,
   "description": "F-Commerce Order Manager",
   "workspaces": [
+    "packages/contracts",
     "frontend",
-    "backend",
-    "packages/contracts"
+    "backend"
   ],
   "engines": {
     "node": ">=22 <23",

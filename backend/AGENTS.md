@@ -38,6 +38,7 @@ Migrations live in `backend/drizzle/migrations/`. `db:generate` derives them fro
 - Keep the health smoke test independent from external services.
 - Keep backend dependencies behind the four Clean Architecture layers defined by the root context.
 - Use named exports and avoid `any`.
+- Take every host value (port, database URL, Redis URL, CORS origins, secrets) from validated environment variables. No host-specific API, SDK, or config file belongs in this workspace, and no host name is hardcoded.
 
 ## Gotchas
 
