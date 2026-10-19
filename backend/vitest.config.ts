@@ -5,9 +5,9 @@ export default defineConfig({
     // Database integration tests share one PostgreSQL test database, so test
     // files must not run concurrently.
     fileParallelism: false,
-    // Vitest no longer ignores build output by default. Without this, the
-    // compiled copies in dist/ run a second time, and stale artifacts from
-    // code that no longer exists fail to load.
+    // Build output is never test input, and Vitest no longer ignores dist/ by
+    // default. Keeping it excluded also stops stale artifacts from an older
+    // build from breaking the run.
     exclude: [...configDefaults.exclude, 'dist/**'],
   },
 });
