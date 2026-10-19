@@ -2,10 +2,10 @@
 
 ## Stack
 
-- **Language and runtime**: TypeScript, Node.js
+- **Language and runtime**: TypeScript, Node.js 24 LTS
 - **Framework**: Next.js app router, Express
 - **Key dependencies**: PostgreSQL with Drizzle ORM, JWT authentication, BullMQ with Redis, Cloudinary
-- **Package manager**: npm 10 with npm workspaces
+- **Package manager**: npm 11 with npm workspaces
 
 ## Build approach
 
@@ -38,7 +38,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title.md`.
 
 ## Deployment
 
-Host agnostic. The frontend and the API deploy as two independent services to any Node.js 22 platform: a managed PaaS, a container host, or a plain VM, with no code change between them.
+Host agnostic. The frontend and the API deploy as two independent services to any Node.js 24 platform: a managed PaaS, a container host, or a plain VM, with no code change between them.
 
 - Use no host-specific APIs, config files, build hooks, or SDKs.
 - Read every host value (port, public origin, database URL, secrets, service URLs) from a validated environment variable. Never hardcode a host name.

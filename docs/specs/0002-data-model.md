@@ -118,7 +118,7 @@ The tradeoff is operational complexity - more collections to manage and query co
 | Auth            | JWT with custom endpoints    | Chosen by stack spec; provides fine-grained control for multi-tenant access.                                       |
 | Background jobs | BullMQ + Redis               | Chosen by stack spec; handles async operations like order processing and email.                                    |
 | File storage    | Cloudinary                   | Chosen by stack spec; provides scalable image storage for products and business logos.                             |
-| Hosting         | Any Node.js 22 platform      | Chosen by stack spec; the host is a deployment detail, and both services run on any Node.js 22 platform.           |
+| Hosting         | Any Node.js 24 platform      | Chosen by stack spec; the host is a deployment detail, and both services run on any Node.js 24 platform.           |
 | Observability   | Winston + structured logging | Chosen by stack spec; provides structured logs for debugging.                                                      |
 
 ## Consequences

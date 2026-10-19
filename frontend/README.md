@@ -29,7 +29,7 @@ To learn more about Next.js, take a look at the following resources:
 
 ## Deployment
 
-The app is host agnostic and must build and run on any Node.js 22 platform: a managed PaaS, a container host, or a plain VM.
+The app is host agnostic and must build and run on any Node.js 24 platform: a managed PaaS, a container host, or a plain VM.
 
 - Install from the repository root with `npm ci`.
 - Build the shared contracts first: `npm run build --workspace @f-commerce/contracts`.
