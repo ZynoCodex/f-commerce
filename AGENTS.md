@@ -66,6 +66,7 @@ Host agnostic. The frontend and the API deploy as two independent services to an
 - Use the standard ESLint and Prettier setup for Next.js and Express.
 - Run lint, format, and typecheck before each commit.
 - Use unit and integration tests.
+- When a test mocks a class the code constructs with `new`, the mock implementation must be a regular function, not an arrow; Vitest constructs mock implementations.
 - Run basic continuous integration checks on push for lint, typecheck, and tests.
 
 ## Git

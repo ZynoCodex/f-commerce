@@ -6,11 +6,12 @@ The contracts package contains shared TypeScript DTOs, Zod schemas, enums, and A
 
 ## Key files
 
-| File                | Owns                                       |
-| ------------------- | ------------------------------------------ |
-| `src/index.ts`      | Shared response schemas and inferred types |
-| `src/index.test.ts` | Contract validation tests                  |
-| `package.json`      | Package exports and scripts                |
+| File                  | Owns                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `src/index.ts`        | Shared response schemas and inferred types                                          |
+| `src/index.test.ts`   | Contract validation tests                                                           |
+| `tsconfig.build.json` | Production build program; excludes `src/**/*.test.ts` so `dist/` ships no test code |
+| `package.json`        | Package exports and scripts                                                         |
 
 ## Commands
 

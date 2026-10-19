@@ -46,6 +46,8 @@ Migrations live in `backend/drizzle/migrations/`. `db:generate` derives them fro
 - The server validates the required backend environment variables from docs/specs/0001-stack-and-architecture.md using Zod.
 - Tenant isolation is enforced in two parts: `AsyncLocalStorage` carries the request's `businessId` (`context.ts`), and every Drizzle repository filters on `businessId` explicitly. There is no global query plugin, so a new repository method that forgets the filter leaks data across tenants. Background workers or admin scripts run outside a request must pass the tenant id themselves or use `runWithContext`.
 - Integration tests run against a real PostgreSQL database, not an in-memory one, so `npm run test` needs a reachable server. `src/test-support/pg-test-database.ts` creates `<database>-test`, applies `backend/drizzle/migrations`, and truncates between tests. Test files must stay serial (`vitest.config.ts` sets `fileParallelism: false`) because they share that database.
+- `npm run build` compiles with `tsconfig.build.json`, which keeps `**/*.test.ts` and `src/test-support/**` out of `dist/`. `npm run typecheck` still checks both, and application code must never import `src/test-support`.
+- `vitest.config.ts` excludes `dist/`, so compiled output from an older build is never collected as tests.
 - Foreign keys mean seeded rows need their parents first: insert a `businesses` row before customers, orders, or catalog rows.
 - Timestamps use Drizzle's `Date` mode. Repositories set `updatedAt` by hand; the column default only covers inserts.
 
