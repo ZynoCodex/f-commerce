@@ -30,5 +30,6 @@ npm run test --workspace @f-commerce/contracts
 - Export only DTOs, schemas, enums, and API error types.
 - Keep this package independent from backend internals and frontend components.
 - Use native ESM, strict TypeScript, and named exports.
+- Consumers resolve types from `src/index.ts` but runtime values from `dist/index.js` (the `package.json` exports map), so this workspace must be built before an application build or start. The applications' `prebuild`, `predev`, and `pretest` scripts do that automatically.
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite._

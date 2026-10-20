@@ -32,9 +32,9 @@ To learn more about Next.js, take a look at the following resources:
 The app is host agnostic and must build and run on any Node.js 24 platform: a managed PaaS, a container host, or a plain VM.
 
 - Install from the repository root with `npm ci`.
-- Build the shared contracts first: `npm run build --workspace @f-commerce/contracts`.
-- Build and start this workspace: `npm run build --workspace @f-commerce/frontend`, then `npm run start --workspace @f-commerce/frontend` (`next start`).
+- Build and start this workspace: `npm run build --workspace @f-commerce/frontend`, then `npm run start --workspace @f-commerce/frontend` (`next start`). The workspace `prebuild` script builds `packages/contracts` first, so no separate contracts step is needed.
 - Set `API_ORIGIN` to the deployed API origin. The Next.js server proxies `/api/*` to it, so the browser only ever calls this app's own origin and no CORS or public API URL is involved.
+- There is no dedicated health route; point the platform probe at `/`.
 - No provider-specific config file belongs in the repository. If your host asks for a project root or install directory, point it at `frontend` and install from the repository root.
 
 See the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for host specific details.

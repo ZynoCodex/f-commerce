@@ -42,8 +42,8 @@ Host agnostic. The frontend and the API deploy as two independent services to an
 
 - Use no host-specific APIs, config files, build hooks, or SDKs.
 - Read every host value (port, public origin, database URL, secrets, service URLs) from a validated environment variable. Never hardcode a host name.
-- The browser calls the frontend origin only. The Next.js server proxies `/api/*` to `API_ORIGIN`, so no CORS and no `NEXT_PUBLIC_` variable is needed in production.
-- Deployment builds the `packages/contracts` workspace before the application workspace, then starts it with that workspace's `start` script.
+- The browser calls the frontend origin only. The Next.js server proxies `/api/*` to `API_ORIGIN`, so no CORS and no `NEXT_PUBLIC_` variable is needed in production. The refresh cookie is host only and `SameSite=Strict` on that origin, so browser code must never call the API host directly; that path would need `SameSite=None`, a secure cookie, and CSRF protection.
+- A host builds only the application workspace, then runs that workspace's `start` script. Each application's `prebuild` builds `packages/contracts` first, so no host runs a separate contracts build step.
 - Keep `/health` unauthenticated and free of external dependencies so any platform can probe it.
 - Keep background work in its own process entry point so it can run as a separate service on hosts that require it.
 
