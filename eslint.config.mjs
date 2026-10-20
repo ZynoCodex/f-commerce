@@ -9,8 +9,8 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ['backend/**/*.ts', 'packages/contracts/**/*.ts'],
-    // Standalone tool configs are outside the backend tsconfig program.
-    ignores: ['backend/*.config.ts'],
+    // Standalone tool configs are outside their workspace tsconfig program.
+    ignores: ['backend/*.config.ts', 'packages/contracts/*.config.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,
