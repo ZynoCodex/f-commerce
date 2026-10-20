@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run build --workspace @f-commerce/contracts",
     "dev": "tsx watch src/server.ts",
+    "prebuild": "npm run build --workspace @f-commerce/contracts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "lint": "eslint .",

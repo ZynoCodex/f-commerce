@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run build --workspace @f-commerce/contracts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
