@@ -22,14 +22,15 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 8   | Products & categories             | Slice 2    | planned |
 | 9   | Orders (CRUD + status workflow)   | Slice 2    | planned |
 | 10  | Payments                          | Slice 2    | planned |
-| 11  | Inventory management              | Slice 3    | planned |
-| 12  | Delivery & shipping               | Slice 3    | planned |
-| 13  | Expenses & profit calculation     | Slice 3    | planned |
-| 14  | Dashboard                         | Slice 3    | planned |
-| 15  | Reports                           | Slice 4    | planned |
-| 16  | Search & filters                  | Slice 4    | planned |
-| 17  | Notifications                     | Slice 4    | planned |
-| 18  | Invoice generation                | Slice 4    | planned |
+| 11  | Inventory management              | Slice 4    | planned |
+| 12  | Delivery & shipping               | Slice 4    | planned |
+| 13  | Expenses & profit calculation     | Slice 4    | planned |
+| 14  | Dashboard                         | Slice 4    | planned |
+| 15  | Reports                           | Slice 5    | planned |
+| 16  | Search & filters                  | Slice 5    | planned |
+| 17  | Notifications                     | Slice 5    | planned |
+| 18  | Invoice generation                | Slice 5    | planned |
+| 19  | OAuth provider login              | Slice 3    | planned |
 
 ## Foundations
 
@@ -159,7 +160,16 @@ Payment methods (cash, bKash, Nagad, bank transfer), partial/full payments, due 
 
 - [ ] Design it (spec): `/architect payments`
 
-## Slice 3: Inventory & Financials
+## Slice 3: OAuth login
+
+### 19. OAuth provider login · needs a decision
+
+Real Google and Facebook sign in end to end: the backend verifies the provider token and links the identity to an existing account by email, and the sign in screen offers both provider buttons. This replaces the development mock route, which returns 501 in production.
+**Done when:** a seller signs in with Google or Facebook through the browser, an existing email account links rather than fails (spec 0003 AC-6), a bad or expired provider token is rejected, and the mock route is gone.
+
+- [ ] Design it (spec): `/architect oauth provider login`
+
+## Slice 4: Inventory & Financials
 
 ### 11. Inventory management · needs a decision
 
@@ -189,7 +199,7 @@ Mobile-first dashboard with sales summary, order summary, financial summary, inv
 
 - [ ] Design it (spec): `/architect dashboard`
 
-## Slice 4: Reporting & Polish
+## Slice 5: Reporting & Polish
 
 ### 15. Reports · needs a decision
 

@@ -1,4 +1,4 @@
-import { Request, Response, Router } from 'express';
+import { CookieOptions, Request, Response, Router } from 'express';
 import { AuthService } from '../../application/services/auth.service.js';
 import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware.js';
 import { config } from '../../infrastructure/config.js';
@@ -21,6 +21,23 @@ export const authRouter = Router();
 // Instantiate repository and service (simple DI for now)
 const authRepository = new DrizzleAuthRepository();
 const authService = new AuthService(authRepository);
+
+/**
+ * The refresh token stays in a host only cookie scoped to the frontend origin.
+ * Browser code reaches the API only through the Next.js proxy on that same
+ * origin, which is what keeps the cookie first party. A client that called the
+ * API on another domain would stop sending it; that topology needs
+ * `SameSite=None`, a secure cookie, and an explicit CSRF defense.
+ */
+const refreshCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: config.NODE_ENV === 'production',
+  sameSite: 'strict',
+};
+
+function setRefreshCookie(res: Response, refreshToken: string): void {
+  res.cookie('refreshToken', refreshToken, refreshCookieOptions);
+}
 
 authRouter.post(
   '/invite',
@@ -71,11 +88,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
       // Token decode failed, leave businessId undefined
     }
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    setRefreshCookie(res, tokens.refreshToken);
     res.status(201).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof DuplicateEmailError) {
@@ -108,11 +121,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       // Token decode failed, leave businessId undefined
     }
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    setRefreshCookie(res, tokens.refreshToken);
     res.status(200).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
@@ -152,11 +161,7 @@ authRouter.post('/oauth/:provider', async (req: Request, res: Response) => {
       // Token decode failed, leave businessId undefined
     }
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    setRefreshCookie(res, tokens.refreshToken);
     res.status(200).json({ accessToken: tokens.accessToken, businessId });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
@@ -176,11 +181,7 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
     }
 
     const tokens = await authService.refresh(refreshToken);
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
+    setRefreshCookie(res, tokens.refreshToken);
     res.status(200).json({ accessToken: tokens.accessToken });
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof NotFoundError) {

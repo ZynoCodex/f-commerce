@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -9,7 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    exclude: ['e2e/**', 'node_modules/**'],
+    // Keep the Vitest defaults, then drop the Playwright suite and the Next
+    // build output so only source tests are collected.
+    exclude: [...configDefaults.exclude, 'e2e/**', '.next/**'],
     setupFiles: './src/test-setup.ts',
   },
 });

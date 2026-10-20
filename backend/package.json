@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run build --workspace @f-commerce/contracts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "prebuild": "npm run build --workspace @f-commerce/contracts",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -16,10 +18,10 @@
   },
   "dependencies": {
     "@f-commerce/contracts": "*",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.6",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.4",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
@@ -33,7 +35,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/node": "^22.15.0",
+    "@types/node": "^24.19.2",
     "@types/pg": "^8.12.14",
     "@types/supertest": "^7.2.1",
     "drizzle-kit": "^0.31.0",
@@ -41,6 +43,6 @@
     "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.5"
   }
 }

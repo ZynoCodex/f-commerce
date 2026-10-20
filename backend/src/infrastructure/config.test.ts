@@ -6,6 +6,12 @@ import { z } from 'zod';
 // or polluting the process-level config singleton.
 // The real config.ts uses the same schema, so this validates the contract.
 
+// An empty value means the variable is unset, matching the .env.example files.
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   PORT: z.string().default('4000'),
@@ -13,6 +19,8 @@ const envSchema = z.object({
     .string()
     .url()
     .default('postgresql://fcommerce:fcommerce@localhost:5432/fcommerce'),
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
+  TEST_DATABASE_URL: optionalUrl,
   JWT_SECRET: z.string().min(32).default('super-secret-jwt-key-replace-in-production'),
   JWT_REFRESH_SECRET: z
     .string()
@@ -77,6 +85,37 @@ describe('config env schema', () => {
       }
     });
 
+    it('defaults REDIS_URL and treats an empty TEST_DATABASE_URL as unset', () => {
+      const result = envSchema.safeParse({
+        PORT: '4000',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
+        JWT_SECRET: 'a'.repeat(32),
+        JWT_REFRESH_SECRET: 'b'.repeat(32),
+        TEST_DATABASE_URL: '',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.REDIS_URL).toBe('redis://localhost:6379');
+        expect(result.data.TEST_DATABASE_URL).toBeUndefined();
+      }
+    });
+
+    it('accepts TEST_DATABASE_URL when set', () => {
+      const result = envSchema.safeParse({
+        PORT: '4000',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
+        JWT_SECRET: 'a'.repeat(32),
+        JWT_REFRESH_SECRET: 'b'.repeat(32),
+        TEST_DATABASE_URL: 'postgresql://localhost:5432/test-only',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.TEST_DATABASE_URL).toBe('postgresql://localhost:5432/test-only');
+      }
+    });
+
     it('allows optional OAuth fields when set', () => {
       const result = envSchema.safeParse({
         PORT: '4000',
@@ -105,6 +144,18 @@ describe('config env schema', () => {
       if (!result.success) {
         expect(result.error.issues.some((i) => i.path.includes('DATABASE_URL'))).toBe(true);
       }
+    });
+
+    it('rejects a REDIS_URL that is not a valid URL', () => {
+      const result = envSchema.safeParse({
+        PORT: '4000',
+        DATABASE_URL: 'postgresql://localhost:5432/test',
+        JWT_SECRET: 'a'.repeat(32),
+        JWT_REFRESH_SECRET: 'b'.repeat(32),
+        REDIS_URL: 'not-a-url',
+      });
+
+      expect(result.success).toBe(false);
     });
 
     it('rejects when JWT_SECRET is shorter than 32 characters', () => {
