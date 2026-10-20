@@ -1,9 +1,9 @@
-# Spec 0006 Cross-Check Against Existing Code
+# Historical Gap Analysis: Spec 0006 (Superseded)
 
 **Date**: 2026-10-18
-**Scope**: Verify how far the existing codebase covers the products/categories/variants spec and what the gaps are.
+**Status**: Historical only. Do not use this file to plan or verify current work; see `0006-products-categories-variants.md` and `docs/scope/scope.md`.
 
-> **Note (2026-10-18)**: This snapshot predates the MongoDB → PostgreSQL/Drizzle migration. Where it lists Mongoose models, the `tenantPlugin`, or `test-support/mongo-replset.ts` as existing patterns, read the equivalents in `backend/src/infrastructure/database/drizzle/` (schema, repositories) and `backend/src/test-support/pg-test-database.ts`, plus the delta note at the top of spec 0006. The gap analysis itself still holds.
+This snapshot records what existed before the products/categories slice was built. It predates the MongoDB → PostgreSQL/Drizzle migration. Where it lists Mongoose models, the `tenantPlugin`, or `test-support/mongo-replset.ts` as existing patterns, read the equivalents in `backend/src/infrastructure/database/drizzle/` (schema, repositories) and `backend/src/test-support/pg-test-database.ts`. The "Not started" build table below is the pre-implementation state, not current status.
 
 ---
 
