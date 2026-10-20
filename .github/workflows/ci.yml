@@ -70,3 +70,5 @@ jobs:
         if: always()
         run: cat backend.log || true
       - run: npm run build
+        env:
+          API_ORIGIN: http://localhost:4000
