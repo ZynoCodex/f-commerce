@@ -12,6 +12,8 @@ let db: DbType | null = null;
 let testDb: DbType | null = null;
 
 function createDb(): DbType {
+  // TLS travels with the URL (?sslmode=require and friends); pg reads the mode
+  // from the connection string, so no extra pool options are needed here.
   pool = new Pool({ connectionString: config.DATABASE_URL });
   return drizzle(pool, { schema });
 }
