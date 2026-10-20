@@ -19,7 +19,8 @@ export interface ProductVariant {
   price?: number;
   cost?: number;
   stockCount: number;
-  imageUrl?: string;
+  /** null clears a stored image on update; omitted preserves it. */
+  imageUrl?: string | null;
 }
 
 export interface Category extends TenantEntity {

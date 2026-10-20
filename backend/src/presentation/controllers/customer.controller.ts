@@ -5,6 +5,7 @@ import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware
 import { DrizzleCustomerRepository } from '../../infrastructure/database/drizzle/repositories/customer.repository.js';
 import { DrizzleBusinessRepository } from '../../infrastructure/database/drizzle/repositories/business.repository.js';
 import { getTenantId, requestContext } from '../../infrastructure/database/drizzle/context.js';
+import { sendInternalError } from './internal-error.js';
 import {
   CustomerArchivedError,
   CustomerChangedError,
@@ -96,10 +97,7 @@ function sendError(res: Response, error: unknown): void {
     return;
   }
 
-  res.status(500).json({
-    error: 'INTERNAL_ERROR',
-    message: error instanceof Error ? error.message : 'Unknown error',
-  });
+  sendInternalError(res, error);
 }
 
 /** Read the acting user id from the verified token. */

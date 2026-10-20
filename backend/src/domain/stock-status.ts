@@ -18,8 +18,11 @@ export function deriveStockStatus(stockCount: number, lowStockThreshold: number)
  * - lowStock when at least one variant is low and none are in stock
  * - inStock when at least one variant is in stock
  */
-export function deriveVariantProductStatus(variants: { stockCount: number }[]): StockStatus {
-  const statuses = variants.map((v) => deriveStockStatus(v.stockCount, Number.MAX_SAFE_INTEGER));
+export function deriveVariantProductStatus(
+  variants: { stockCount: number }[],
+  lowStockThreshold: number,
+): StockStatus {
+  const statuses = variants.map((v) => deriveStockStatus(v.stockCount, lowStockThreshold));
 
   const hasInStock = statuses.some((s) => s === StockStatus.IN_STOCK);
   const allOutOfStock = statuses.every((s) => s === StockStatus.OUT_OF_STOCK);
@@ -32,7 +35,8 @@ export function deriveVariantProductStatus(variants: { stockCount: number }[]): 
 /**
  * Aggregate stock status for a product, considering whether it has variants.
  * For non-variant products, uses the product-level stockCount.
- * For variant products, aggregates per-variant statuses.
+ * For variant products, aggregates per-variant statuses against the product
+ * threshold.
  */
 export function deriveProductStockStatus(
   stockCount: number,
@@ -42,7 +46,7 @@ export function deriveProductStockStatus(
   if (variants.length === 0) {
     return deriveStockStatus(stockCount, lowStockThreshold);
   }
-  return deriveVariantProductStatus(variants.map((v) => ({ stockCount: v.stockCount })));
+  return deriveVariantProductStatus(variants, lowStockThreshold);
 }
 
 /**

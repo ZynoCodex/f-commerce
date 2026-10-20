@@ -1,0 +1,2 @@
+CREATE INDEX "products_business_lower_name_pattern_idx" ON "products" USING btree ("business_id",lower("name") text_pattern_ops);--> statement-breakpoint
+CREATE INDEX "products_business_sku_pattern_idx" ON "products" USING btree ("business_id","sku" text_pattern_ops) WHERE "products"."sku" IS NOT NULL;
