@@ -18,15 +18,19 @@ const {
   uploadLogoMock: vi.fn(),
 }));
 
-// Mock BusinessService with a factory so the route test can assert on the mock
+// Mock BusinessService with a factory so the route test can assert on the mock.
+// The implementation must be a regular function, not an arrow: the controller
+// calls `new BusinessService(...)`, and Vitest constructs the implementation.
 vi.mock('../../application/services/business.service.js', () => ({
-  BusinessService: vi.fn().mockImplementation(() => ({
-    getBusiness: getBusinessMock,
-    updateBusiness: updateBusinessMock,
-    saveDraft: saveDraftMock,
-    completeOnboarding: completeOnboardingMock,
-    uploadLogo: uploadLogoMock,
-  })),
+  BusinessService: vi.fn().mockImplementation(function () {
+    return {
+      getBusiness: getBusinessMock,
+      updateBusiness: updateBusinessMock,
+      saveDraft: saveDraftMock,
+      completeOnboarding: completeOnboardingMock,
+      uploadLogo: uploadLogoMock,
+    };
+  }),
 }));
 
 // Mock Cloudinary service

@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// An empty value means the variable is unset, matching the .env.example files.
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   PORT: z.string().default('4000'),
@@ -8,6 +14,8 @@ const envSchema = z.object({
     .string()
     .url()
     .default('postgresql://fcommerce:fcommerce@localhost:5432/fcommerce'),
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
+  TEST_DATABASE_URL: optionalUrl,
   JWT_SECRET: z.string().min(32).default('super-secret-jwt-key-replace-in-production'),
   JWT_REFRESH_SECRET: z
     .string()

@@ -1,22 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { BusinessService, AddressData } from '../../application/services/business.service.js';
 import { Business, Currency } from '../../domain/entities/business.entity.js';
+import { IBusinessRepository } from '../../domain/repositories/business.repository.js';
+import { CloudinaryService } from '../../infrastructure/services/cloudinary.service.js';
 
 const mockBusinessRepository = {
   findById: vi.fn(),
   updateProfile: vi.fn(),
   saveDraft: vi.fn(),
   clearDraft: vi.fn(),
-} as unknown as {
-  findById: ReturnType<typeof vi.fn>;
-  updateProfile: ReturnType<typeof vi.fn>;
-  saveDraft: ReturnType<typeof vi.fn>;
-  clearDraft: ReturnType<typeof vi.fn>;
-};
+} as unknown as Mocked<IBusinessRepository>;
 
 const mockCloudinaryService = {
   uploadImage: vi.fn(),
-} as unknown as { uploadImage: ReturnType<typeof vi.fn> };
+} as unknown as Mocked<CloudinaryService>;
 
 const MOCK_DATE = new Date('2026-01-01');
 

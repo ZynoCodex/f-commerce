@@ -1,6 +1,6 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
@@ -27,6 +27,7 @@ npm run test       # Vitest unit plus Playwright e2e
 - Use named exports only; no `any` types.
 - Prefer server components for data fetching; stream data to the client.
 - Design system: build all UI to `design.md` (art direction and the maximalist product bar); token values live in CSS.
+- Browser code calls the API through relative `/api/...` paths only. Never hardcode a backend host in client code; the Next.js server proxies `/api/*` to `API_ORIGIN`, and `API_ORIGIN` comes from the environment.
 
 ## Gotchas
 
