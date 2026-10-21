@@ -152,6 +152,15 @@ export const products = pgTable(
       .on(table.businessId, table.sku)
       .where(sql`${table.sku} IS NOT NULL`),
     index('products_business_lower_name_idx').on(table.businessId, sql`lower(${table.name})`),
+    // Pattern indexes make LIKE prefix search collation independent. The
+    // default-collation index above still serves ORDER BY lower(name).
+    index('products_business_lower_name_pattern_idx').on(
+      table.businessId,
+      sql`lower(${table.name}) text_pattern_ops`,
+    ),
+    index('products_business_sku_pattern_idx')
+      .on(table.businessId, sql`${table.sku} text_pattern_ops`)
+      .where(sql`${table.sku} IS NOT NULL`),
     index('products_business_category_idx').on(table.businessId, table.categoryId),
     index('products_business_archived_name_idx').on(table.businessId, table.isArchived, table.name),
   ],

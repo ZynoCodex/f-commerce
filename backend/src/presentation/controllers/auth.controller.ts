@@ -15,6 +15,7 @@ import {
   ConflictError,
   NotFoundError,
 } from '../../domain/errors.js';
+import { sendInternalError } from './internal-error.js';
 
 export const authRouter = Router();
 
@@ -60,7 +61,7 @@ authRouter.post(
       if (error instanceof ConflictError) {
         res.status(409).json({ error: error.message });
       } else {
-        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+        sendInternalError(res, error);
       }
     }
   },
@@ -94,7 +95,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     if (error instanceof DuplicateEmailError) {
       res.status(409).json({ error: error.message });
     } else {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendInternalError(res, error);
     }
   }
 });
@@ -127,7 +128,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message });
     } else {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendInternalError(res, error);
     }
   }
 });
@@ -167,7 +168,7 @@ authRouter.post('/oauth/:provider', async (req: Request, res: Response) => {
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message });
     } else {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendInternalError(res, error);
     }
   }
 });
@@ -187,7 +188,7 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
     if (error instanceof UnauthorizedError || error instanceof NotFoundError) {
       res.status(401).json({ error: error.message });
     } else {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendInternalError(res, error);
     }
   }
 });
@@ -201,7 +202,7 @@ authRouter.post('/logout', async (req: Request, res: Response) => {
     }
     res.status(200).json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    sendInternalError(res, error);
   }
 });
 
@@ -219,7 +220,7 @@ authRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
     if (error instanceof NotFoundError) {
       res.status(404).json({ error: error.message });
     } else {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      sendInternalError(res, error);
     }
   }
 });

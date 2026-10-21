@@ -672,16 +672,24 @@ describe('Business Controller - PUT /onboarding/draft', () => {
     expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'logoUrl', '');
   });
 
-  it('returns 500 when the service throws an error', async () => {
+  it('returns 500 when the service throws an error without leaking its message', async () => {
     saveDraftMock.mockRejectedValueOnce(new Error('DB write failed'));
 
-    const res = await request(app)
-      .put('/api/business/onboarding/draft')
-      .set('x-business-id', 'biz-target')
-      .send({ field: 'name', value: 'Draft' });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await request(app)
+        .put('/api/business/onboarding/draft')
+        .set('x-business-id', 'biz-target')
+        .send({ field: 'name', value: 'Draft' });
 
-    expect(res.status).toBe(500);
-    expect(res.body.error).toBe('DB write failed');
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({
+        error: 'INTERNAL_ERROR',
+        message: 'The server could not complete the request.',
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

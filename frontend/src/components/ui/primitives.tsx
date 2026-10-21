@@ -8,7 +8,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useId, useRef } from 'react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 
@@ -49,21 +49,60 @@ export function IconButton({ label, className = '', ...props }: ButtonProps & { 
 }
 
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`${controlClassName} w-full ${className}`} {...props} />;
+  const field = useContext(FieldControlContext);
+  return (
+    <input
+      className={`${controlClassName} w-full ${className}`}
+      {...props}
+      id={props.id ?? field?.id}
+      aria-describedby={
+        [field?.describedBy, props['aria-describedby']].filter(Boolean).join(' ') || undefined
+      }
+      aria-invalid={props['aria-invalid'] ?? (field?.invalid ? true : undefined)}
+    />
+  );
 }
 
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={`${controlClassName} w-full ${className}`} {...props} />;
+  const field = useContext(FieldControlContext);
+  return (
+    <select
+      className={`${controlClassName} w-full ${className}`}
+      {...props}
+      id={props.id ?? field?.id}
+      aria-describedby={
+        [field?.describedBy, props['aria-describedby']].filter(Boolean).join(' ') || undefined
+      }
+      aria-invalid={props['aria-invalid'] ?? (field?.invalid ? true : undefined)}
+    />
+  );
 }
 
 export function Textarea({
   className = '',
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const field = useContext(FieldControlContext);
   return (
-    <textarea className={`${controlClassName} min-h-28 w-full py-3 ${className}`} {...props} />
+    <textarea
+      className={`${controlClassName} min-h-28 w-full py-3 ${className}`}
+      {...props}
+      id={props.id ?? field?.id}
+      aria-describedby={
+        [field?.describedBy, props['aria-describedby']].filter(Boolean).join(' ') || undefined
+      }
+      aria-invalid={props['aria-invalid'] ?? (field?.invalid ? true : undefined)}
+    />
   );
 }
+
+interface FieldControlContextValue {
+  id: string;
+  describedBy?: string;
+  invalid: boolean;
+}
+
+const FieldControlContext = createContext<FieldControlContextValue | null>(null);
 
 export function Field({
   children,
@@ -87,9 +126,9 @@ export function Field({
       <label className="text-sm font-semibold text-ink" htmlFor={htmlFor}>
         {label}
       </label>
-      <div aria-describedby={describedBy} aria-invalid={Boolean(error)}>
+      <FieldControlContext.Provider value={{ id: htmlFor, describedBy, invalid: Boolean(error) }}>
         {children}
-      </div>
+      </FieldControlContext.Provider>
       {description && (
         <p className="text-sm text-muted" id={descriptionId}>
           {description}
@@ -241,9 +280,40 @@ function useOverlay(onClose: () => void, open: boolean) {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus();
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const root = ref.current;
+      if (!root) return;
+      const focusable = Array.from(root.querySelectorAll<HTMLElement>(focusableSelector));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        root.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first || active === root) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || active === root) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
@@ -268,13 +338,15 @@ export function Dialog({
   title: string;
 }) {
   const ref = useOverlay(onClose, open);
+  const titleId = useId();
+  const descriptionId = useId();
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" role="presentation">
       <div
-        aria-describedby={description ? 'dialog-description' : undefined}
-        aria-labelledby="dialog-title"
+        aria-describedby={description ? descriptionId : undefined}
+        aria-labelledby={titleId}
         aria-modal="true"
         className="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-panel"
         ref={ref}
@@ -283,11 +355,11 @@ export function Dialog({
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-ink" id="dialog-title">
+            <h2 className="text-xl font-semibold text-ink" id={titleId}>
               {title}
             </h2>
             {description && (
-              <p className="mt-1 text-sm text-body" id="dialog-description">
+              <p className="mt-1 text-sm text-body" id={descriptionId}>
                 {description}
               </p>
             )}
@@ -314,12 +386,13 @@ export function Sheet({
   title: string;
 }) {
   const ref = useOverlay(onClose, open);
+  const titleId = useId();
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/40" role="presentation">
       <aside
-        aria-labelledby="sheet-title"
+        aria-labelledby={titleId}
         aria-modal="true"
         className="ml-auto flex h-full w-full max-w-md flex-col border-l border-border bg-surface p-6 shadow-panel"
         ref={ref}
@@ -327,7 +400,7 @@ export function Sheet({
         tabIndex={-1}
       >
         <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-ink" id="sheet-title">
+          <h2 className="text-xl font-semibold text-ink" id={titleId}>
             {title}
           </h2>
           <IconButton label="Close sheet" onClick={onClose} variant="quiet">

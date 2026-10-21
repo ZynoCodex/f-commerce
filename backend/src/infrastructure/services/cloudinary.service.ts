@@ -14,10 +14,29 @@ export interface CloudinaryUploadResult {
 
 export class CloudinaryService {
   async uploadImage(buffer: Buffer, businessId?: string): Promise<CloudinaryUploadResult> {
+    return this.upload(buffer, businessId ? `business-logos/${businessId}` : 'business-logos');
+  }
+
+  /** Product images live under the business, with variants in their own folder. */
+  async uploadProductImage(
+    buffer: Buffer,
+    businessId: string,
+    variant = false,
+  ): Promise<CloudinaryUploadResult> {
+    const folder = variant ? `products/${businessId}/variants` : `products/${businessId}`;
+    return this.upload(buffer, folder);
+  }
+
+  /** Remove an uploaded asset. Only called for assets the database does not reference. */
+  async destroyImage(publicId: string): Promise<void> {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+  }
+
+  private upload(buffer: Buffer, folder: string): Promise<CloudinaryUploadResult> {
     return new Promise<CloudinaryUploadResult>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
-          folder: businessId ? `business-logos/${businessId}` : 'business-logos',
+          folder,
           resource_type: 'image',
         },
         (error, result) => {

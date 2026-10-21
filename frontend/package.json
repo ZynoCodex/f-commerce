@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm run build --workspace @f-commerce/contracts",
     "dev": "next dev",
     "prebuild": "npm run build --workspace @f-commerce/contracts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build --workspace @f-commerce/contracts",
     "test": "vitest run",
     "e2e": "playwright test"
   },

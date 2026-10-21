@@ -1,79 +1,15 @@
-The migration is complete and verified end to end. Here's the summary.
-What changed
-Database layer (Mongoose → PostgreSQL + Drizzle)
-- backend/src/infrastructure/database/drizzle/schema.ts — all 16 tables with real FKs, partial unique indexes (product/variant SKU, order idempotency key), and lower(name) expression indexes for case-insensitive search/sort/uniqueness.
-- backend/drizzle/migrations/0000_init.sql — generated with drizzle-kit, applied to your local f-commerce database (16 tables, 6 special indexes confirmed present).
-- Repositories: DrizzleAuthRepository, DrizzleBusinessRepository, DrizzleCustomerRepository (version guards, cursor paging, archive/restore + audit in one transaction).
-- Deleted the entire database/mongoose/ tree, test-support/mongo-replset.ts, pg-test-container.ts, scripts/backfill-customer-version.ts, and the Mongo-only tests. mongoose, mongodb-memory-server (never declared) and pg-mem are gone from the dependency tree.
-Tests now run against real PostgreSQL
-- backend/src/test-support/pg-test-database.ts creates <database>-test, applies migrations, truncates between tests; vitest.config.ts serializes test files.
-- customer.controller.route.test.ts and business.repository.integration.test.ts ported off Mongoose. The old vi.spyOn(AuditLogModel, 'create') rollback test is now an actor token with an invalid UUID user id, so the audit insert fails inside the transaction and proves the rollback for real.
-- Result: 232 backend tests in 15 files pass, plus frontend (7 files) and contracts (1 file).
-Bugs found and fixed while porting
-- isDuplicateKeyError only read error.code; Drizzle wraps driver errors, so a duplicate-phone race would have returned 500 instead of 409. It now walks the cause chain.
-- saveDraft used jsonb_build_object($1, …), which Postgres can't type-infer; it now merges a single jsonb parameter.
-- toBusiness cast a null draft through instead of mapping it to undefined.
-- User.passwordHash is now optional, matching the nullable column and OAuth-only accounts.
-Infrastructure and docs
-- docker-compose.yml runs postgres:18 (matching your local 18.6) plus Redis; .github/workflows/ci.yml starts Postgres, runs the suite with DATABASE_URL, applies migrations, then boots the backend.
-- backend/.env and .env.example now use DATABASE_URL (and document TEST_DATABASE_URL).
-- Updated root and backend AGENTS.md (stack, tenant-isolation model, test-DB rules, db:generate/db:migrate commands) and added dated delta notes to specs 0001, 0002, 0003, 0005, and 0006 — including the normalized product_variants delta you asked for.
-Verification
-- lint, typecheck, format:check, build — all green across workspaces.
-- Live smoke test against local Postgres: register → draft save → onboarding complete → customer create → duplicate-phone 409 → prefix search → edit → profile with spend totals → archive → restore → stale-version 409 → login. Rows and both audit entries verified directly in Postgres, then the smoke data was truncated.
-Suggested next steps
-- Products/categories (spec 0006 milestone 1, scope row 8) is next; the schema it needs already exists.
-- I didn't run the Playwright suite locally (needs browsers plus a long-running stack) — CI covers it with the new Postgres steps.
-- Pre-existing unrelated wrinkle: .env.example documents JWT_ACCESS_SECRET/JWT_ACCESS_TTL but config.ts reads JWT_SECRET/JWT_REFRESH_SECRET; defaults keep it working, but worth aligning.
-- If you want the migration recorded as its own decision document, /architect can write docs/specs/0007-…; I only added delta notes so the existing specs stay honest without rewriting their history.
+Products and categories (spec 0006, scope row 8) are implemented, verified, reviewed, and documented on `feat/products`.
 
+Current state
+- Contracts, backend, and frontend builds are green. Typecheck, lint, and format checks pass.
+- Tests last run: 290 backend passed with 1 skipped, 87 frontend passed, 32 contracts passed.
+- Fresh review: `docs/reviews/2026-10-21-feat-products.md`, approve with 3 informational nits, 0 major and 0 minor.
+- PR text: `docs/PRs/2026-10-21-feat-products.md`.
+- Scope row 8 is marked done.
 
+Remaining before merge
+- Commit the catalog work in milestones, push `feat/products`, and open the PR against `main`.
+- Accepted risks: Cloudinary assets are retained after image removal or product hard delete per AC-5; the migration adds indexes with plain `CREATE INDEX` while the catalog is new; the variant matrix reconciliation is bounded at 50 variants.
 
-
-
-
-Non-code changes to actually be host-agnostic
-- A written build/start contract to replace the per-platform config: install from repo root, build contracts, build the workspace, start command, health path, env var list. That's the thing every new host needs, and it's currently implicit in the spec.
-- Update the specs. docs/specs/0001-stack-and-architecture.md names Vercel and Render in about a dozen places (lines 10, 20, 28, 36, 46, 59, 66, 120, 124, 147, 161). Since specs are your source of truth and later skills read them, leaving "deploys to Vercel / deploys to Render" there will keep steering future work toward those hosts. This is a real spec change, not a doc tidy-up.
-
-Q: The refresh cookie, only if you go cross-domain
-If you ever host the frontend and API on different registrable domains (not app.example.com + api.example.com, which are same-site — but e.g. x.vercel.app + y.onrender.com), sameSite: 'strict' means the browser never sends the refresh cookie. That path needs sameSite: 'none' + secure + real CSRF protection. Staying same-origin avoids all of it. Flagging it because "deploy anywhere" often quietly means "deploy them to two different domains."
-
-Short answer: not necessary for your setup, and nothing in the cookie needed a behavior fix. The warning is real only when the browser calls the API host directly. In this app it never does: client code calls relative /api/* paths on the frontend origin, and the Next.js server on the frontend host proxies them to the backend server to server. SameSite is a browser rule, and server to server hops are invisible to it.
-Concretely, with frontend on x.vercel.app and backend on y.onrender.com:
-1. The browser loads and calls only x.vercel.app.
-2. Login responds with Set-Cookie: refreshToken=...; Path=/; HttpOnly; SameSite=Strict and no Domain attribute, so the browser stores it for x.vercel.app (host only).
-3. A later /api/auth/refresh goes to x.vercel.app with the cookie attached. It is first party, Strict is satisfied, the Next proxy forwards it to y.onrender.com, and the rotated cookie comes back the same way.
-I proved the exact two service shape locally just now, split like yours. Register through the frontend origin returned the Set-Cookie above, refresh through the same origin returned 200 with a rotated cookie, and the same call without the cookie returned a clean 400. The only production differences are the HTTPS hop and the Secure attribute (set when NODE_ENV=production), both handled by the browser as first party. The two different domains are fine; what matters is the browser's view, which stays one origin.
-When it would bite you (the tripwire worth remembering): the moment any browser code calls the API host directly, for example an absolute https://y.onrender.com/api/... in a component or a public API URL variable. Then the fetch is cross-site (vercel.app and onrender.com are different sites, and separate *.vercel.app subdomains never count as one site either), Strict means the browser will not attach the cookie, and session refresh silently stops while login still appears to work. That path needs SameSite=None + Secure + a real CSRF defense. Keep client calls relative and this never happens.
-What I changed anyway, because a review finding should end up recorded, not just answered:
-- backend/src/presentation/controllers/auth.controller.ts: the four copied cookie option blocks are now one setRefreshCookie helper with a comment stating why SameSite=Strict is load bearing and what the cross-domain path would require.
-- docs/specs/0001-stack-and-architecture.md: fixed a sentence that claimed cookie endpoints have "an explicit CSRF defense" (they do not; SameSite=Strict is the defense), and the deployment contract now records the single-origin constraint.
-- Root AGENTS.md: one clause on the deployment bullet so future code keeps client calls relative.
-- The cookie itself is untouched: Strict, host only, Secure in production. That is correct for this architecture, so there was nothing behavioral to fix.
-- Verified after the change: backend typecheck and lint clean, format:check clean, and the 26 auth controller tests pass.
-For the live test, the thing that actually breaks people:
-1. API_ORIGIN on the frontend host must be set at build time (it is read in next.config.ts during next build). Setting it only as a runtime variable on Vercel changes nothing, and changing it needs a redeploy. If /api/* fails, it is almost always this.
-2. Set NODE_ENV=production on the backend so the cookie gets Secure.
-3. CORS_ORIGINS does not matter for the proxied flow (there are no browser cross-origin calls); set it to the frontend origin only if you also poke the API directly from a browser tab.
-4. On a free tier that sleeps, the first request can exceed the frontend's 10 second timeout, so the first login attempt can look like a failure. Just retry once it wakes.
-One housekeeping note: running next dev regenerated one heading line in frontend/AGENTS.md (# to ##). That is Next's own generator re-adding its block, safe to keep when you commit. Everything above is uncommitted alongside your earlier pending work.
-
-
-
-Necessary: yes, it is the point of the whole change. removing the per-platform config without a written replacement would leave a new host operator with nothing to follow, and it is exactly the "real spec change" you called it. And it is also done, on this branch, mostly by the same commit we discussed last turn.
-Here is the finding's checklist mapped to what is actually written now:
-Item	Where it is written
-Install from repo root	Spec 0001, deployment contract: "installs from the repository root with npm ci" (plus root AGENTS.md, frontend/README.md)
-Build contracts	Spec: "builds packages/contracts first through its prebuild script"
-Build the workspace	Spec: "builds the application workspace"; literal commands in frontend/README.md and backend/AGENTS.md
-Start command	Spec names both: "next start for the frontend, node dist/server.js for the backend"
-Health path	Spec: "/health queries neither PostgreSQL nor Redis, so a platform probe only checks that the process is up"; root AGENTS.md: "Keep /health unauthenticated and free of external dependencies"
-Env var list	Spec, environment contract: every backend variable by name plus optional TEST_DATABASE_URL, and frontend API_ORIGIN; the tracked .env.example files are the documented templates
-All of that is committed at HEAD on feat/platform-agnostic-deployment (commit 1017d40, whose message literally reads "Replace Vercel and Render decisions in the specs and AGENTS files with a host-agnostic deployment contract"), and the working tree carries a sharpened version of the same paragraph (prebuild semantics, fail-fast startup, trust proxy, cookie constraint). So no, it is not "implicit" anymore on the branch.
-Two honest caveats:
-1. The finding is right about main. Same reachability problem as the previous two findings: the branch is unpushed, so main still shows the per-platform paragraph ("Vercel uses frontend as its project root... Render uses backend...") and a weaker contract. Landing the branch closes this finding and the last one together.
-2. Two small asymmetries I noticed while checking, beyond the finding's list:
-- The literal copy-pasteable runbook exists for the frontend (frontend/README.md got a Deployment block in 1017d40) but the backend has no README, so its exact build/start/migrate commands live only in backend/AGENTS.md and package.json.
-- The contract names the backend's health path but says nothing about what a host probes for the frontend (there is no /health route there; / is the natural probe).
-Neither blocks a host deploy, and the checklist as stated is fully covered. If you want, I can close both in a minute: a deployment block in a new backend/README.md mirroring the frontend's, and one clause in the spec stating the frontend probe path. Say the word. Otherwise the action owed is still the same one: push the branch or fast-forward main so the contract stops being hidden from everyone reading main.
+Next slice
+- Orders (scope row 9) still needs a design decision before `/architect orders`.

@@ -42,7 +42,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Authentication failed');
+        throw new Error(data.message || data.error || 'Authentication failed');
       }
 
       const data = await res.json();

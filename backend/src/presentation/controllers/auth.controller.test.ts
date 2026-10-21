@@ -298,11 +298,20 @@ describe('Auth Controller', () => {
     it('returns 500 when logout service fails', async () => {
       vi.mocked(AuthService.prototype.logout).mockRejectedValueOnce(new Error('Database error'));
 
-      const res = await request(app)
-        .post('/api/auth/logout')
-        .set('Cookie', 'refreshToken=some_token');
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const res = await request(app)
+          .post('/api/auth/logout')
+          .set('Cookie', 'refreshToken=some_token');
 
-      expect(res.status).toBe(500);
+        expect(res.status).toBe(500);
+        expect(res.body).toEqual({
+          error: 'INTERNAL_ERROR',
+          message: 'The server could not complete the request.',
+        });
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 

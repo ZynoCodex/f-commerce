@@ -18,7 +18,8 @@ The Next.js UI runs on port 3000 and uses server components by default. It impor
 npm run dev        # start dev server (frontend on 3000, backend on 4000)
 npm run build      # next build
 npm run lint       # ESLint over the whole workspace
-npm run test       # Vitest unit plus Playwright e2e
+npm run test       # Vitest unit tests
+npm run e2e        # Playwright end to end tests
 ```
 
 ## Conventions

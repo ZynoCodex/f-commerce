@@ -34,7 +34,7 @@ npm run format:check
 
 ## Specs
 
-Stored in `docs/specs/`. Format: `docs/specs/NNNN-title.md`.
+Stored in `docs/specs/`. Newer specs use a folder per feature: `docs/specs/NNNN-title/index.md`, with `rationale.md` and `verify.md` beside it. Earlier specs use a single `docs/specs/NNNN-title.md`.
 
 ## Deployment
 
