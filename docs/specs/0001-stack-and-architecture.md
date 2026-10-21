@@ -73,7 +73,7 @@ The product needs a separate frontend and backend, but separate deployment does 
 | Shared contracts            | `packages/contracts`, types and Zod schemas only                 | Both applications can share runtime checked request and response contracts without importing domain or infrastructure code.                                                                                                                     |
 | API shape                   | Versioned REST JSON at `/api/v1`                                 | Keeps the API explicit and evolvable. Responses use `{success, data, message}` and Zod validates runtime input and output boundaries.                                                                                                           |
 | Observability               | Winston with structured logging                                  | Matches the data model spec and provides JSON logs with a clear path to request IDs and secret redaction.                                                                                                                                       |
-| Rate limiting               | Simple per-IP limiter                                            | One global limiter (e.g., 100 requests/min). Easy to implement, protects against abuse without complex config.                                                                                                                                  |
+| Rate limiting               | Layered `express-rate-limit` middleware                          | A global per-IP backstop plus narrower login, registration, refresh, and authenticated upload buckets. In-memory today; a shared store is a follow-up for multi-instance deployments.                                                           |
 
 ## Scaffold constraints
 
@@ -135,6 +135,15 @@ In the backend, Express routes and controllers are the presentation layer, use c
 **Security and configuration defaults**:
 
 The backend derives tenant context from verified authentication data and applies it to every business query. Each repository filters by `businessId` explicitly, and repository tests cover tenant isolation. Access JWTs are short lived. Refresh tokens are rotated and kept in a secure HTTP only cookie. The cookie is host only with `SameSite=Strict`, which is the CSRF defense for the cookie based endpoints while the browser stays on the frontend origin. CORS reads an allowlist from validated environment variables and includes local and approved preview origins only. Server secrets stay in the backend environment. The frontend exposes no backend secret and needs no `NEXT_PUBLIC_` variable, because the browser only calls the frontend origin.
+
+**Rate limiting and security headers**:
+
+The backend applies `helmet()` globally, so every response carries the standard security headers. `express-rate-limit` adds a 100 requests/min per-IP backstop to the API, skipping `/health` so platform probes are never throttled. Extra buckets protect login by IP (10 failed attempts per 15 minutes) and by normalized email (20 failed attempts per 15 minutes), registration (5 per hour per IP), refresh (60 per minute per IP), and authenticated image uploads (10 per minute per user, before multer buffers the file). Successful logins do not consume the login allowance, and rejected requests return the API's JSON error shape.
+
+Two follow-ups are required before the backend runs as more than one instance or relies on per-IP limits for security:
+
+- **Shared limiter store**: the limiters use `express-rate-limit`'s in-memory store. Counters are per process, reset on restart, and are not shared across instances, so every instance enforces its own quota. When the backend scales beyond one process, or when BullMQ and Redis land, replace the store with a Redis-backed store using the existing `REDIS_URL` contract so the limits are global.
+- **Trustworthy client IP**: per-IP keys come from `req.ip` with one trusted proxy hop (`trust proxy = 1`). The host/Next proxy must overwrite `X-Forwarded-For`; a custom client can otherwise supply the header and spoof the key. The per-account login limit and per-user upload limit key on verified data and are not affected. Configure the edge proxy to overwrite the header, or terminate at a trusted proxy that does, before treating per-IP limits as a security boundary. Add another proxy hop only when a CDN or load balancer actually fronts the host, and raise `trust proxy` at the same time.
 
 **CI boundaries**:
 
