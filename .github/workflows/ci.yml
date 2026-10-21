@@ -49,6 +49,9 @@ jobs:
           PORT: 4000
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/f-commerce
           CORS_ORIGINS: http://localhost:3000
+          # The suite creates many accounts from one IP; limiter behavior is
+          # covered by the backend test suite instead.
+          RATE_LIMIT_DISABLED: 'true'
         run: npm run dev --workspace @f-commerce/backend > backend.log 2>&1 &
       - name: Wait for backend and database
         run: |

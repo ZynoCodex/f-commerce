@@ -8,6 +8,7 @@ import {
 } from '@f-commerce/contracts';
 import { ProductService } from '../../application/services/product.service.js';
 import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware.js';
+import { uploadRateLimiter } from '../middlewares/rate-limit.middleware.js';
 import { DrizzleProductRepository } from '../../infrastructure/database/drizzle/repositories/product.repository.js';
 import { DrizzleCategoryRepository } from '../../infrastructure/database/drizzle/repositories/category.repository.js';
 import { CloudinaryProductImageStorage } from '../../infrastructure/services/cloudinary-product-image-storage.js';
@@ -253,6 +254,7 @@ productRouter.delete('/:id', async (req: Request, res: Response) => {
 
 productRouter.post(
   '/:id/images',
+  uploadRateLimiter,
   upload.array('images', 5),
   async (req: Request, res: Response) => {
     try {
@@ -290,6 +292,7 @@ productRouter.delete('/:id/images/:index', async (req: Request, res: Response) =
 
 productRouter.post(
   '/:id/variants/:variantIndex/image',
+  uploadRateLimiter,
   upload.single('image'),
   async (req: Request, res: Response) => {
     try {

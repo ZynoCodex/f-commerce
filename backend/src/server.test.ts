@@ -58,6 +58,11 @@ describe('backend scaffold', () => {
       const response = await fetch(`http://127.0.0.1:${port}/health`);
 
       expect(response.status).toBe(200);
+      expect(response.headers.get('x-powered-by')).toBeNull();
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN');
+      expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+      expect(response.headers.get('strict-transport-security')).toContain('max-age=31536000');
       await expect(response.json()).resolves.toEqual({
         success: true,
         data: { status: 'ok' },

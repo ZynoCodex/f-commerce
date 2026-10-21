@@ -53,6 +53,16 @@ vi.mock('../middlewares/auth.middleware.js', () => ({
   ),
 }));
 
+// Route tests exercise the logo handler many times in one process; the limiter
+// has its own test file, so let these requests pass through.
+vi.mock('../middlewares/rate-limit.middleware.js', () => ({
+  uploadRateLimiter: (
+    _req: import('express').Request,
+    _res: import('express').Response,
+    next: import('express').NextFunction,
+  ) => next(),
+}));
+
 // Mock runWithContext to establish context and await async callbacks.
 // The real runWithContext establishes AsyncLocalStorage context; for tests
 // we need the async callback to fully resolve before Express proceeds.

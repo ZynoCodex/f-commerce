@@ -29,6 +29,16 @@ vi.mock('cloudinary', () => {
   };
 });
 
+// Route tests exercise upload handlers many times in one process; the limiter
+// has its own test file, so let these requests pass through.
+vi.mock('../middlewares/rate-limit.middleware.js', () => ({
+  uploadRateLimiter: (
+    _req: import('express').Request,
+    _res: import('express').Response,
+    next: import('express').NextFunction,
+  ) => next(),
+}));
+
 import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';

@@ -27,6 +27,12 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().default(''),
   CLOUDINARY_API_SECRET: z.string().default(''),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
+  // Test-only escape hatch for end-to-end suites that create many accounts
+  // from one IP. The rate-limit middleware ignores it in production.
+  RATE_LIMIT_DISABLED: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);
