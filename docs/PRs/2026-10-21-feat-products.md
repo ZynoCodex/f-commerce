@@ -6,7 +6,7 @@ Adds the products and categories slice from spec 0006. Sellers can create catego
 
 ## Why
 
-Implements `docs/specs/0006-products-categories-variants.md`, the catalog foundation that the orders and payments slices depend on. The slice enrolls products and categories in `docs/scope/scope.md` as the next product workflow step.
+Implements `docs/specs/0006-products-categories-variants/index.md`, the catalog foundation that the orders and payments slices depend on. The slice enrolls products and categories in `docs/scope/scope.md` as the next product workflow step.
 
 ## Changes
 

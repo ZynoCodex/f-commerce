@@ -145,13 +145,13 @@ Product CRUD with images, SKU, stock tracking, categories, low-stock thresholds,
 **Done when:** user can add products with variants, see stock status (in stock/low/out), and archive them.
 
 - [x] Design it (spec): `/architect products`
-      Spec [0006](../specs/0006-products-categories-variants.md)
+      Spec [0006](../specs/0006-products-categories-variants/index.md)
 - [x] Build it: `/develop products`
   - [x] Data, contracts and category foundation with indexes and backfill (AC-1, AC-3, AC-4, AC-8, AC-12, AC-14)
   - [x] Product create, list and search with derived stock, filters and cursor paging (AC-1, AC-2, AC-3, AC-4, AC-6, AC-7, AC-8, AC-13)
   - [x] Images, edits, archive, restore and hard delete with version and audit transactions (AC-5, AC-9, AC-10, AC-11, AC-14)
   - [x] Tenant guards, timeout handling and catalog screens for list, detail and variants (AC-6, AC-9, AC-10, AC-11, AC-12, AC-13, AC-15, AC-16)
-- [x] Verify it: `/check verify products`
+- [x] Verify it: `/check verify products` — See [verify.md](../specs/0006-products-categories-variants/verify.md).
 - [x] Test it: `/test products` — 290 backend, 87 frontend and 32 contract tests pass; typecheck, lint and format checks clean.
 - [x] Review it (fresh model): `/check review products` — See [2026-10-21-feat-products.md](../reviews/2026-10-21-feat-products.md), approve with nits.
 - [x] Document it: `/document products` — See [2026-10-21-feat-products.md](../PRs/2026-10-21-feat-products.md).
