@@ -1,6 +1,19 @@
 import type { Request, Response } from 'express';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 
+import { config } from '../../infrastructure/config.js';
+
+/**
+ * End-to-end suites create many accounts and sign-ins from one IP. CI sets
+ * this flag so those tests exercise application behaviour instead of the
+ * limiter; production ignores it even if the variable is set.
+ */
+const rateLimitsDisabled = config.RATE_LIMIT_DISABLED && config.NODE_ENV !== 'production';
+
+function skipWhenDisabled(): boolean {
+  return rateLimitsDisabled;
+}
+
 /** Every limiter returns the API's JSON error shape instead of Express's default text. */
 function sendRateLimited(_request: Request, response: Response): void {
   response.status(429).json({
@@ -30,7 +43,7 @@ export const globalRateLimiter = rateLimit({
   ...baseOptions,
   windowMs: 60_000,
   limit: 100,
-  skip: (request) => request.path === '/health',
+  skip: (request) => rateLimitsDisabled || request.path === '/health',
 });
 
 /**
@@ -43,6 +56,7 @@ export const loginIpRateLimiter = rateLimit({
   windowMs: 15 * 60_000,
   limit: 10,
   skipSuccessfulRequests: true,
+  skip: skipWhenDisabled,
 });
 
 function loginAccountKey(request: Request): string {
@@ -62,18 +76,21 @@ export const loginAccountRateLimiter = rateLimit({
   limit: 20,
   skipSuccessfulRequests: true,
   keyGenerator: loginAccountKey,
+  skip: skipWhenDisabled,
 });
 
 export const registerRateLimiter = rateLimit({
   ...baseOptions,
   windowMs: 60 * 60_000,
   limit: 5,
+  skip: skipWhenDisabled,
 });
 
 export const refreshRateLimiter = rateLimit({
   ...baseOptions,
   windowMs: 60_000,
   limit: 60,
+  skip: skipWhenDisabled,
 });
 
 /**
@@ -89,4 +106,5 @@ export const uploadRateLimiter = rateLimit({
     request.user?.userId
       ? `upload:${request.user.userId}`
       : `upload:ip:${ipKeyGenerator(request.ip ?? '')}`,
+  skip: skipWhenDisabled,
 });
