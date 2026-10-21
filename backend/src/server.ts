@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './infrastructure/config.js';
 import {
   closeDatabase,
@@ -12,6 +13,13 @@ import { businessRouter } from './presentation/controllers/business.controller.j
 import { customerRouter } from './presentation/controllers/customer.controller.js';
 import { categoryRouter } from './presentation/controllers/category.controller.js';
 import { productRouter } from './presentation/controllers/product.controller.js';
+import {
+  globalRateLimiter,
+  loginAccountRateLimiter,
+  loginIpRateLimiter,
+  refreshRateLimiter,
+  registerRateLimiter,
+} from './presentation/middlewares/rate-limit.middleware.js';
 
 const app = express();
 const port = Number(config.PORT);
@@ -21,6 +29,7 @@ const shutdownTimeoutMs = 10_000;
 // single hop to keep req.ip and req.protocol honest. Raise it if a CDN also
 // fronts the host.
 app.set('trust proxy', 1);
+app.use(helmet());
 
 const corsOrigins = config.CORS_ORIGINS.split(',');
 app.use(
@@ -31,6 +40,13 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+
+// Rate limits run after body parsing so the login limiter can key on the
+// submitted email, and before the routers so rejected requests do no work.
+app.use(globalRateLimiter);
+app.use('/api/auth/login', loginIpRateLimiter, loginAccountRateLimiter);
+app.use('/api/auth/register', registerRateLimiter);
+app.use('/api/auth/refresh', refreshRateLimiter);
 
 app.use('/api/auth', authRouter);
 app.use('/api/business', businessRouter);

@@ -2,6 +2,7 @@ import { Request, Response, Router } from 'express';
 import multer from 'multer';
 import { BusinessService } from '../../application/services/business.service.js';
 import { requireAuth, requireBusinessRole } from '../middlewares/auth.middleware.js';
+import { uploadRateLimiter } from '../middlewares/rate-limit.middleware.js';
 import { DrizzleBusinessRepository } from '../../infrastructure/database/drizzle/repositories/business.repository.js';
 import { CloudinaryService } from '../../infrastructure/services/cloudinary.service.js';
 import { detectImageType } from '../../domain/image-type.js';
@@ -207,6 +208,7 @@ businessRouter.put('/me', requireBusinessRole(['OWNER']), async (req: Request, r
 businessRouter.post(
   '/logo',
   requireBusinessRole(['OWNER']),
+  uploadRateLimiter,
   upload.single('image'),
   async (req: Request, res: Response) => {
     try {
