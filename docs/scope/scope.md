@@ -31,6 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 17  | Notifications                     | Slice 5    | planned     |
 | 18  | Invoice generation                | Slice 5    | planned     |
 | 19  | OAuth provider login              | Slice 3    | planned     |
+| 20  | Marketing site                    | Launch     | planned     |
 
 ## Foundations
 
@@ -238,6 +239,16 @@ Printable invoice with business info, customer info, items, totals, payment meth
 **Done when:** user can print invoice or save as PDF via browser print.
 
 - [ ] Design it (spec): `/architect invoices`
+
+## Launch
+
+### 20. Marketing site · needs a decision
+
+A public multipage site that explains the product, builds trust, and sends visitors into sign up. The first version covers Home, Features, Pricing, About, Contact, FAQ, Customer Stories, Privacy, and Terms. The pricing page presents the plans and a sign up path while subscription billing stays deferred.
+
+**Done when:** Home is the public root route and every listed page is reachable from shared public navigation, works on mobile and desktop, has a clear call to action, and routes interested visitors to register or sign in while signed in sellers can reach the dashboard.
+
+- [ ] Design it (spec): `/architect marketing site`
 
 ## /scope replan · F-Commerce Order Manager
 
