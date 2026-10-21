@@ -20,7 +20,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6   | Business profile & onboarding     | Slice 1    | done        |
 | 7   | Customers                         | Slice 1    | done        |
 | 8   | Products & categories             | Slice 2    | done        |
-| 9   | Orders (CRUD + status workflow)   | Slice 2    | planned     |
+| 9   | Orders (CRUD + status workflow)   | Slice 2    | in-progress |
 | 10  | Payments                          | Slice 2    | planned     |
 | 11  | Inventory management              | Slice 4    | planned     |
 | 12  | Delivery & shipping               | Slice 4    | planned     |
@@ -32,6 +32,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 18  | Invoice generation                | Slice 5    | planned     |
 | 19  | OAuth provider login              | Slice 3    | planned     |
 | 20  | Marketing site                    | Launch     | planned     |
+| 21  | Product variant archiving         | Slice 2    | planned     |
 
 ## Foundations
 
@@ -157,12 +158,23 @@ Product CRUD with images, SKU, stock tracking, categories, low-stock thresholds,
 - [x] Review it (fresh model): `/check review products` — See [2026-10-21-feat-products.md](../reviews/2026-10-21-feat-products.md), approve with nits.
 - [x] Document it: `/document products` — See [2026-10-21-feat-products.md](../PRs/2026-10-21-feat-products.md).
 
-### 9. Orders (CRUD + status workflow) · needs a decision
+### 9. Orders (CRUD + status workflow) · in-progress
 
 Order creation from customer/product selection, status states, order history, source tracking, formula calculations.
 **Done when:** user can create order in ~60 seconds, see status timeline, and order persists correctly.
 
-- [ ] Design it (spec): `/architect orders`
+- [x] Design it (spec): `/architect orders`
+      Spec [0007](../specs/0007-orders/index.md)
+- [ ] Build it: `/develop orders`
+  - [ ] Data, contracts and migration: snapshots, version, line identity, history, counters, indexes and backfills (AC-2, AC-3, AC-11, AC-17)
+  - [ ] Create path and first screens: transactional create with counter, merging, totals and audit, plus `/orders`, `/orders/new` and a minimal detail page (AC-1, AC-2, AC-4, AC-11, AC-17)
+  - [ ] Detail, timeline, search and paging: stored snapshots, history, status filters, digit phone search, cursor binding and Load more (AC-7, AC-8, AC-14, AC-16, AC-18)
+  - [ ] Edits, concurrency and workflow: `lineId` replacement, version guards, transition table, history rows and in place edit (AC-3, AC-9, AC-10, AC-13, AC-16, AC-18)
+  - [ ] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
+- [ ] Verify it: `/check verify orders`
+- [ ] Test it: `/test orders`
+- [ ] Review it (fresh model): `/check review orders`
+- [ ] Document it: `/document orders`
 
 ### 10. Payments · needs a decision
 
@@ -170,6 +182,13 @@ Payment methods (cash, bKash, Nagad, bank transfer), partial/full payments, due 
 **Done when:** user can record multiple payments against an order and see correct due amount.
 
 - [ ] Design it (spec): `/architect payments`
+
+### 21. Product variant archiving · needs a decision
+
+Let a seller retire a variant without deleting it, so past order lines keep a live reference and a later restock or restore can find it again.
+**Done when:** an archived variant leaves the new order and product pickers, stays readable on old orders through its stored label, and can be restored with its identity and SKU intact.
+
+- [ ] Design it (spec): `/architect product variant archiving`
 
 ## Slice 3: OAuth login
 
