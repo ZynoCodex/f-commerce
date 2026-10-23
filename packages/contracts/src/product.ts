@@ -279,6 +279,8 @@ export const ProductVersionSchema = z.object({
 });
 
 export const VariantDtoSchema = z.object({
+  /** Persisted variant id, used to reference the variant when creating an order. */
+  id: z.string().optional(),
   combination: z.record(z.string(), z.string()),
   sku: z.string().nullable(),
   price: z.number().nullable(),
