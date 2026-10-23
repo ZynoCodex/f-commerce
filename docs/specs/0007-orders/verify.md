@@ -54,6 +54,19 @@ _Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `
 - [x] Sign in as STAFF and create, edit, and change status → every action succeeds inside the business → AC-12
 - [x] Inspect backend logs during the run → customer names, phones, addresses, and order notes are absent → AC-12
 
+## Delivery deadline (pending build)
+
+_Added with the 2026-10-23 update. These steps run after the delivery deadline build tasks 10 to 12. The original 18 acceptance criteria above stay verified._
+
+- [ ] Create an order with no deadline, then with a future date, then with a past date → the create response, list, and detail carry the right value; the detail shows `Not set` for the null case; the past date shows the form warning and still saves → AC-1, AC-7, AC-8, AC-15, AC-16, AC-19
+- [ ] Edit a pending order to set a deadline, change it, clear it, set the same value twice, and send a stale version → the set, change, and clear each bump the version once and write an audit naming `deliveryDeadline`; the same value does not write; the stale version returns `ORDER_CHANGED` → AC-9, AC-17, AC-19
+- [ ] Move an order with a past deadline to `PROCESSING` and `SHIPPED`, then try a deadline edit → the date and `Overdue` badge stay visible, and the edit returns `ORDER_LOCKED` → AC-9, AC-14, AC-16, AC-19
+- [ ] Open a `DELIVERED`, `CANCELLED`, and `RETURNED` order with a past deadline → the date shows and the `Overdue` badge does not → AC-14, AC-16, AC-19
+- [ ] Send `2026-02-30`, `2026-13-01`, and `2026-1-1` on create and edit → 400 `VALIDATION_ERROR` with `deliveryDeadline`, and nothing changes → AC-11, AC-19
+- [ ] Render a deadline around midnight in two browser timezones, then reload after the local day changes → the date keeps the same calendar day, and the `Overdue` badge follows the viewer's local today → AC-19
+- [ ] Query the live database for `orders.delivery_deadline` → the nullable `date` column exists, existing rows are null, and no deadline index was added → AC-19
+- [ ] Rerun the backend, frontend, and contracts suites plus lint, typecheck, and format → all pass → AC-1 to AC-19 (regression gate)
+
 ## Commands
 
 - [x] `npm run db:migrate --workspace @f-commerce/backend` → the live command reports migrations applied successfully with no pending work; a scratch database applied the migration files over a seeded `ORD-0007`, backfilled `Legacy Buyer` and `Unknown customer`, seeded the counter to 7, and created `ORD-0008` next → AC-2, AC-3, AC-17
@@ -83,6 +96,7 @@ _Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `
 - AC-16 detail, actions, edit in place, conflict, and accessibility · covered by the detail, status, edit, reorder, conflict, and keyboard UI steps
 - AC-17 atomic writes, audit metadata, and rollback · covered by the rollback API steps and the audit step
 - AC-18 exactly one history row per creation and status change, with the stored actor name · covered by the detail and status UI steps and the status API step
+- AC-19 the optional delivery deadline, date validation, past date warning, edit lock, audit, and derived `Overdue` badge · covered by the pending delivery deadline steps
 
 ## Findings
 
@@ -91,3 +105,4 @@ _Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `
 - The shell footer still shows the hardcoded `Bangladesh · BDT` badge after the business currency changes. Order amounts use the business currency; this badge existed before this feature and sits outside the order amounts.
 - The checklist steps for duplicate add, reorder, limit 500, and currency were corrected to match spec 0007 and the observed UI.
 - The initial list load shows three visual skeletons without live status text. The Load more state announces `Loading orders…` with `role="status"`, and the error state uses `role="alert"`. This is a minor accessibility note, not a blocker.
+- The delivery deadline steps are pending the build tasks 10 to 12. They are unchecked on purpose, and the original 18 acceptance criteria stay verified.

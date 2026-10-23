@@ -173,8 +173,8 @@ Order creation from customer/product selection, status states, order history, so
   - [x] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
         Code in `packages/contracts/src/order.ts`, `backend/src/application/services/order.service.ts`, `backend/src/presentation/controllers/order.controller.ts`, `frontend/src/app/orders/`
 - [x] Verify it: `/check verify orders` — all 18 acceptance criteria verified at runtime; backend, frontend and contract suites pass; lint, typecheck, format and build clean. See [verify.md](../specs/0007-orders/verify.md).
-- [ ] Test it: `/test orders`
-- [ ] Review it (fresh model): `/check review orders`
+- [x] Test it: `/test orders` — 339 backend, 136 frontend and 76 contract tests pass; 4 orders E2E runs pass on desktop and mobile; typecheck, lint and format checks clean.
+- [x] Review it (fresh model): `/check review orders` — See [2026-10-23-feat-orders.md](../reviews/2026-10-23-feat-orders.md)
 - [ ] Document it: `/document orders`
 
 ### 10. Payments · needs a decision

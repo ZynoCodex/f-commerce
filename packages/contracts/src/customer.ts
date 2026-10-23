@@ -21,29 +21,34 @@ export type CustomerAuditActionType =
 export type CustomerErrorCodeType = (typeof CustomerErrorCode)[keyof typeof CustomerErrorCode];
 
 const MAX_OPTIONAL_TEXT = 500;
+const emailSchema = z.string().email('Invalid email format');
 
 /** Create treats omitted, null, and blank optional fields the same way: absent. */
 const createOptionalText = z
   .string()
+  .trim()
   .max(MAX_OPTIONAL_TEXT)
   .nullable()
   .optional()
   .transform((value) => {
     if (value === null || value === undefined) return undefined;
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
+    return value === '' ? undefined : value;
   });
 
+/**
+ * Trim and turn a blank value into absent first, then validate the result.
+ * Validating first would reject surrounding whitespace and a blank field.
+ */
 const createOptionalEmail = z
   .string()
-  .email('Invalid email format')
+  .trim()
   .nullable()
   .optional()
   .transform((value) => {
     if (value === null || value === undefined) return undefined;
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
-  });
+    return value === '' ? undefined : value;
+  })
+  .pipe(emailSchema.optional());
 
 /**
  * Edit keeps omitted fields unchanged, while null or blank clears the field.
@@ -52,27 +57,27 @@ const createOptionalEmail = z
  */
 const editOptionalText = z
   .string()
+  .trim()
   .max(MAX_OPTIONAL_TEXT)
   .nullable()
   .optional()
   .transform((value) => {
     if (value === undefined) return undefined;
     if (value === null) return null;
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
+    return value === '' ? null : value;
   });
 
 const editOptionalEmail = z
   .string()
-  .email('Invalid email format')
+  .trim()
   .nullable()
   .optional()
   .transform((value) => {
     if (value === undefined) return undefined;
     if (value === null) return null;
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
-  });
+    return value === '' ? null : value;
+  })
+  .pipe(emailSchema.nullable().optional());
 
 export const CustomerCreateSchema = z.object({
   name: z

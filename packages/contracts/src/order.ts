@@ -51,31 +51,39 @@ const MAX_MONEY_INPUT = 100_000_000;
 const MAX_OPTIONAL_TEXT = 500;
 const MAX_STATUS_NOTE = 200;
 
+/**
+ * A defensive cap on the raw request array, not the order line limit. Lines
+ * are merged by product and variant first, and the service enforces the real
+ * limit of 50 distinct pairs after merging (AC-1, AC-11). A generous bound
+ * here still limits the payload size without rejecting valid merged orders.
+ */
+const MAX_RAW_ORDER_LINES = 200;
+
 const moneyInput = z.number().int().min(0).max(MAX_MONEY_INPUT);
 
 /** Create treats omitted, null, and blank optional text the same way: absent. */
 const createOptionalText = z
   .string()
+  .trim()
   .max(MAX_OPTIONAL_TEXT)
   .nullable()
   .optional()
   .transform((value) => {
     if (value === null || value === undefined) return null;
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
+    return value === '' ? null : value;
   });
 
 /** Edit keeps omitted fields unchanged, while null or blank clears the field. */
 const editOptionalText = z
   .string()
+  .trim()
   .max(MAX_OPTIONAL_TEXT)
   .nullable()
   .optional()
   .transform((value) => {
     if (value === undefined) return undefined;
     if (value === null) return null;
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
+    return value === '' ? null : value;
   });
 
 /** One line in a create request. Lines with the same pair are merged server side. */
@@ -93,7 +101,7 @@ export const OrderItemUpdateInputSchema = OrderItemInputSchema.extend({
 
 export const OrderCreateSchema = z.object({
   customerId: z.string().uuid(),
-  items: z.array(OrderItemInputSchema).min(1).max(50),
+  items: z.array(OrderItemInputSchema).min(1).max(MAX_RAW_ORDER_LINES),
   source: OrderSourceSchema,
   deliveryFee: moneyInput.optional().default(0),
   discount: moneyInput.optional().default(0),
@@ -105,7 +113,7 @@ export const OrderCreateSchema = z.object({
 export const OrderUpdateSchema = z.object({
   version: z.number().int().min(1),
   customerId: z.string().uuid().optional(),
-  items: z.array(OrderItemUpdateInputSchema).min(1).max(50).optional(),
+  items: z.array(OrderItemUpdateInputSchema).min(1).max(MAX_RAW_ORDER_LINES).optional(),
   deliveryFee: moneyInput.optional(),
   discount: moneyInput.optional(),
   shippingAddress: editOptionalText,
@@ -118,13 +126,13 @@ export const OrderStatusChangeSchema = z.object({
   version: z.number().int().min(1),
   note: z
     .string()
+    .trim()
     .max(MAX_STATUS_NOTE)
     .nullable()
     .optional()
     .transform((value) => {
       if (value === null || value === undefined) return null;
-      const trimmed = value.trim();
-      return trimmed === '' ? null : trimmed;
+      return value === '' ? null : value;
     }),
 });
 

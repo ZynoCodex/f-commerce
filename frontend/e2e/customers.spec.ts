@@ -46,6 +46,10 @@ test.describe('customer records', () => {
     );
   }
 
+  function as(token: string, businessId: string) {
+    return { Authorization: `Bearer ${token}`, 'x-business-id': businessId };
+  }
+
   test('create, search, edit and archive a customer through the screens', async ({
     page,
     request: apiRequest,
@@ -178,5 +182,129 @@ test.describe('customer records', () => {
       timeout: 20_000,
     });
     await expect(page.getByText(/cannot be used for new transactions/i)).toBeVisible();
+  });
+
+  test('restores an archived customer from the duplicate phone offer', async ({
+    page,
+    request: apiRequest,
+  }) => {
+    const { accessToken, businessId } = await signUpOwner(apiRequest);
+    await setAuthState(page, accessToken, businessId);
+    const headers = as(accessToken, businessId);
+
+    const unique = randomUUID().replace(/\D/g, '').slice(0, 8).padStart(8, '9');
+    const phone = `+8804${unique}`;
+    const created = await apiRequest.post('/api/customers', {
+      data: { name: 'Archived Buyer', phone },
+      headers,
+    });
+    expect(created.ok()).toBe(true);
+    const id = (await created.json()).data.id as string;
+
+    const archived = await apiRequest.post(`/api/customers/${id}/archive`, {
+      data: { version: 1 },
+      headers,
+    });
+    expect(archived.ok()).toBe(true);
+
+    await page.goto('/customers');
+    await page.getByRole('button', { name: /add customer/i }).click();
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Returning Buyer');
+    await page.getByRole('textbox', { name: 'Phone', exact: true }).fill(phone);
+    await page.getByRole('button', { name: /save customer/i }).click();
+
+    // AC-3: a duplicate that belongs to an archived customer offers restore.
+    await expect(page.getByText('This phone belongs to an archived customer')).toBeVisible();
+    await expect(
+      page.getByText('Open their record to restore them, then make any changes there.'),
+    ).toBeVisible();
+
+    await page.getByRole('link', { name: /open the existing customer/i }).click();
+    await page.waitForURL(new RegExp(`/customers/${id}$`));
+    await expect(page.getByRole('heading', { name: 'Archived Buyer' })).toBeVisible();
+    await expect(page.getByText('Archived', { exact: true })).toBeVisible();
+    await expect(page.getByText(/cannot be used for new transactions/i)).toBeVisible();
+
+    await page.getByRole('button', { name: /^restore$/i }).click();
+
+    // AC-9: restore returns the customer to the active lists.
+    await expect(page.getByText('Customer restored and back in your lists.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^edit$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^restore$/i })).toHaveCount(0);
+    await expect(page.getByText('Archived', { exact: true })).toHaveCount(0);
+
+    await page.getByRole('link', { name: /back to customers/i }).click();
+    await page.getByRole('searchbox', { name: /search by name or phone/i }).fill('Archived Buyer');
+    await expect(page.getByRole('link', { name: 'Archived Buyer' }).first()).toBeVisible();
+  });
+
+  test('shows the spend summary and order history on a customer profile', async ({
+    page,
+    request: apiRequest,
+  }) => {
+    const { accessToken, businessId } = await signUpOwner(apiRequest);
+    await setAuthState(page, accessToken, businessId);
+    const headers = as(accessToken, businessId);
+    const suffix = randomUUID().slice(0, 8);
+
+    const category = await apiRequest.post('/api/categories', {
+      data: { name: `History Tops ${suffix}` },
+      headers,
+    });
+    expect(category.ok()).toBe(true);
+    const categoryId = (await category.json()).data.id as string;
+
+    const product = await apiRequest.post('/api/products', {
+      data: {
+        name: 'History Tee',
+        categoryId,
+        sku: `HIST-${suffix}`,
+        price: 1200,
+        stockCount: 5,
+      },
+      headers,
+    });
+    expect(product.ok()).toBe(true);
+    const productId = (await product.json()).data.id as string;
+
+    const unique = randomUUID().replace(/\D/g, '').slice(0, 8).padStart(8, '9');
+    const customer = await apiRequest.post('/api/customers', {
+      data: { name: 'History Buyer', phone: `+8805${unique}` },
+      headers,
+    });
+    expect(customer.ok()).toBe(true);
+    const customerId = (await customer.json()).data.id as string;
+
+    const order = await apiRequest.post('/api/orders', {
+      data: {
+        customerId,
+        items: [{ productId, quantity: 1 }],
+        source: 'DIRECT',
+      },
+      headers,
+    });
+    expect(order.ok()).toBe(true);
+    const orderNumber = (await order.json()).data.orderNumber as string;
+
+    await page.goto(`/customers/${customerId}`);
+    await expect(page.getByRole('heading', { name: 'History Buyer' })).toBeVisible();
+    await expect(page.getByText('No orders for this customer yet')).toHaveCount(0);
+
+    // AC-6 and AC-7: the profile shows what the customer spent and owes.
+    const summary = page.getByRole('heading', { name: 'Spend summary' }).locator('..');
+    await expect(summary.getByText('Orders', { exact: true })).toBeVisible();
+    await expect(summary.getByText('1', { exact: true })).toBeVisible();
+    await expect(summary.getByText(/\$1,200\.00/)).toHaveCount(2);
+
+    const history = page.getByRole('heading', { name: 'Order history' }).locator('..');
+    const isNarrow = (page.viewportSize()?.width ?? 0) < 768;
+    const orderNumberMatches = history.getByText(orderNumber, { exact: true });
+    await expect(isNarrow ? orderNumberMatches.last() : orderNumberMatches.first()).toBeVisible();
+    if (isNarrow) {
+      await expect(history.getByText('Total $1,200.00', { exact: true })).toBeVisible();
+      await expect(history.getByText('Due $1,200.00', { exact: true })).toBeVisible();
+    } else {
+      await expect(history.getByRole('cell', { name: '$1,200.00' })).toHaveCount(2);
+    }
   });
 });

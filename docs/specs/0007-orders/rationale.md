@@ -72,3 +72,41 @@ The order number uses a counter row per business inside the create transaction. 
 Version guarded writes match customers and products. A STAFF member and the owner can both work an order, so two open phones are a real case. A stale save must fail loudly rather than overwrite a newer status or total.
 
 Money and stock stay out of this slice because features 10 and 11 own them. The order stores `paidAmount` 0 and `dueAmount` equal to `total`, and the payments feature will become the only writer of those fields. Inventory will add reservation and deduction around the status moves. Keeping the boundary now means neither later feature has to unwind an order implementation that already moved money or stock.
+
+## Update 2026-10-23: promised delivery date
+
+### Context
+
+The seller often promises a delivery day in the same chat where the order is taken. Before this update the order had no field for that promise, so it lived only in the conversation and the seller had to remember which buyers were waiting. The seller needs to record the promised delivery date on the order and see when an active order has passed it, without a new reminder system or a change to the status workflow. The field is optional because not every sale carries a promise.
+
+The existing order is a strict record with an edit lock once the order moves past `CONFIRMED`, version guarded writes, and an append only history. The update had to fit those rules rather than create a parallel edit path.
+
+### Options considered
+
+**Date only versus timestamp versus free text.** A calendar date in `YYYY-MM-DD` is the chosen shape. A promise is a day, not a moment, and a timestamp would invent a time the seller never gave. It would also invite a UTC shift that shows the wrong day to a viewer west of the server. Free text cannot be validated, compared, or shown consistently. The nullable PostgreSQL `date` column and the `z.iso.date()` contract check keep the value a real day with no time or timezone.
+
+**Edit under the existing lock versus always editable versus a separate endpoint.** The chosen rule follows the existing lock: the deadline can change only while the order is `PENDING` or `CONFIRMED`. This keeps one edit path, one version guard, and one audit row. Always editable would let a promise change after the order record is otherwise closed, with no clear rule for the version or the audit. A separate endpoint for the date is more surface than one field needs, and it would split the edit contract.
+
+**Derived Overdue badge versus a stored flag versus no badge.** The badge is derived in the browser. It costs no column, no scheduled write, and no status change, and it can never go stale. A stored flag would need a job or a write on every read to stay true, and it would need a fixed timezone to decide when the day rolls over. No badge would leave the promise useful only when the seller opens the order. The badge is a view of the stored date, not a new order state.
+
+**Allow past dates with a warning versus reject past dates.** Past dates are allowed. A seller may record an order after the promised day, or record a promise the buyer already missed. A hard rule would block the truth and push the seller to invent a future date. The form warns so a typo is visible, but the save is not blocked.
+
+**Viewer local today versus a server day versus a business timezone now.** The badge compares the stored date with the viewer's local today, the calendar date in the browser's timezone. The stored value is not converted. A server day would use the server's timezone, which has no relationship to the seller. A business timezone is the right long term answer when reports or two viewers need one fixed day boundary, but the business profile has no timezone field today and adding one is a separate change. The limitation is recorded as a follow up.
+
+**Field name `deliveryDeadline` versus `promisedDeliveryDate` versus `dueDate`.** The user asked for a promised delivery date. `deliveryDeadline` is the chosen stored and wire name: it matches the seller's word for the promise and the `Delivery deadline` UI label. `promisedDeliveryDate` is the most faithful name for the requirement, but it is longer and would rename the field, the column, and the contract after the decision was written. `dueDate` is short but reads like money owed, and the order already has `dueAmount`. The chosen name keeps the deadline distinct from the money due, and the promised delivery date stays the plain words every screen uses.
+
+**Column mode string versus Date on `delivery_deadline`.** The Drizzle column uses string mode, so the driver hands back `YYYY-MM-DD` with no JavaScript `Date` in the path. Date mode would build a `Date` at the server's local midnight, and any later `toISOString` or `new Date` on it could shift the day before the client ever sees it. String mode makes the no shift rule structural rather than a discipline the build must remember.
+
+### Rationale
+
+The update is deliberately small. It adds one nullable date to the order, one field on create and edit, one date and one badge on list and detail, and no new table, endpoint, permission, configuration, dependency, filter, sort, reminder, or index. The promised delivery date is a promise about the order, so it belongs on the order and follows the order's edit rules. It is not a courier event, a payment date, or a status. Keeping it out of totals, duplicate detection, search, and the status workflow means the existing order contract does not move.
+
+The date only choice is the important one. A promise is spoken as a day. Storing a timestamp would force a time and a timezone the seller never gave, and the same stored value would render as a different day for different viewers. A `date` column, string mode on the driver, and a date only formatter keep the day stable everywhere. The cost is that the system cannot rank promises within a day, which the product does not need.
+
+The Overdue badge is a view, not a record. It is computed from the stored date and the viewer's local today, so it changes with the calendar without a write. It appears only for `PENDING`, `CONFIRMED`, `PROCESSING`, and `SHIPPED`, because a delivered, cancelled, or returned order no longer needs a delivery follow up. The day itself is not overdue. A deadline of today gives the seller the rest of the day.
+
+The edit lock is a deliberate tradeoff. A promise can slip after the order moves to `PROCESSING` or `SHIPPED`, and this slice cannot record that change. The alternative is a separate date edit path, which would weaken, for one field, the rule that the order is locked once fulfillment starts. The cleaner follow up is to let feature 12, which owns delivery, decide how a courier event and a changed promise interact. Until then, the seller can record the promise while the order is `PENDING` or `CONFIRMED`, which covers the moment the promise is usually made.
+
+Past dates are allowed because the record should match what happened. A warning is enough for the common typo, and a hard block would make a late recorded order impossible to represent honestly.
+
+The remaining limits are intentional. No filter means the seller cannot isolate overdue orders, but the Active list already shows the active queue and the badge marks the late ones. No reminder means the seller is not notified, but the badge is visible when the list is open. No index is needed because no query filters or sorts by the deadline. Each of these is a follow up with evidence, not a guess.

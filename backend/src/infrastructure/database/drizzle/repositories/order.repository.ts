@@ -524,7 +524,13 @@ export class DrizzleOrderRepository implements IOrderRepository {
                 position: item.position,
                 updatedAt: now,
               })
-              .where(and(eq(orderItems.id, item.id), eq(orderItems.businessId, businessId)));
+              .where(
+                and(
+                  eq(orderItems.id, item.id),
+                  eq(orderItems.orderId, id),
+                  eq(orderItems.businessId, businessId),
+                ),
+              );
           }
         }
 

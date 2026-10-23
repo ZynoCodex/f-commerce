@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrderSummaryDto } from '@f-commerce/contracts';
@@ -182,6 +182,79 @@ describe('OrdersPage', () => {
 
     expect(await screen.findAllByRole('link', { name: 'ORD-0002' })).not.toHaveLength(0);
     expect(screen.getAllByRole('link', { name: 'ORD-0001' }).length).toBeGreaterThan(0);
+  });
+
+  it('drops a load more response that lands after the filter changed', async () => {
+    const user = userEvent.setup();
+    let resolveStale: ((response: Response) => void) | undefined;
+    const stalePage = new Promise<Response>((resolve) => {
+      resolveStale = resolve;
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('cursor=cursor-1')) return stalePage;
+      if (url.includes('status=SHIPPED')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              items: [
+                makeOrder({
+                  id: 'order-3',
+                  orderNumber: 'ORD-0003',
+                  customerName: 'Shipped buyer',
+                  status: 'SHIPPED',
+                }),
+              ],
+              nextCursor: null,
+            },
+          }),
+        );
+      }
+      if (url.startsWith('/api/orders?')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: { items: [makeOrder()], nextCursor: 'cursor-1' },
+          }),
+        );
+      }
+      return Promise.resolve(
+        metadata(url) ?? jsonResponse(404, { error: 'NOT_FOUND', message: 'Not found' }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findAllByRole('link', { name: 'ORD-0001' });
+
+    const loadMore = screen.getByRole('button', { name: 'Load more orders' });
+    await waitFor(() => expect(loadMore).not.toBeDisabled());
+    await user.click(loadMore);
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([input]) => String(input).includes('cursor=cursor-1')),
+      ).toBe(true),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Shipped' }));
+    expect(await screen.findAllByRole('link', { name: 'ORD-0003' })).not.toHaveLength(0);
+
+    await act(async () => {
+      resolveStale?.(
+        jsonResponse(200, {
+          success: true,
+          data: {
+            items: [makeOrder({ id: 'order-2', orderNumber: 'ORD-0002', customerName: 'Rafi' })],
+            nextCursor: null,
+          },
+        }),
+      );
+    });
+
+    expect(screen.queryByRole('link', { name: 'ORD-0002' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'ORD-0003' }).length).toBeGreaterThan(0);
   });
 
   it('shows an empty state that points to the first order', async () => {

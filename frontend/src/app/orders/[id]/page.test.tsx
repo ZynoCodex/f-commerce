@@ -284,6 +284,102 @@ describe('OrderDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Confirm order' })).not.toBeInTheDocument();
   });
 
+  it('cancels a pending order through the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const cancelled = makeOrder({
+      status: 'CANCELLED',
+      version: 2,
+      updatedAt: updated,
+      history: [
+        makeOrder().history[0],
+        historyEntry('CANCELLED', 'PENDING', 'Buyer changed their mind'),
+      ],
+    });
+    const fetchMock = installedFetch((url, init) => {
+      if (url === '/api/orders/order-1/status' && init?.method === 'POST') {
+        return jsonResponse(200, { success: true, data: cancelled });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: makeOrder() });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Cancel order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancel this order?' });
+    await user.type(within(dialog).getByLabelText('Note'), 'Buyer changed their mind');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel order' }));
+
+    expect(await screen.findByText('Order moved to Cancelled.')).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const statusCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/orders/order-1/status' &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(JSON.parse(String((statusCall?.[1] as RequestInit).body))).toEqual({
+      status: 'CANCELLED',
+      version: 1,
+      note: 'Buyer changed their mind',
+    });
+  });
+
+  it('returns a delivered order through the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const delivered = makeOrder({
+      status: 'DELIVERED',
+      version: 5,
+      updatedAt: updated,
+      history: [
+        makeOrder().history[0],
+        historyEntry('CONFIRMED', 'PENDING'),
+        historyEntry('PROCESSING', 'CONFIRMED'),
+        historyEntry('SHIPPED', 'PROCESSING'),
+        historyEntry('DELIVERED', 'SHIPPED'),
+      ],
+    });
+    const returned = makeOrder({
+      status: 'RETURNED',
+      version: 6,
+      updatedAt: updated,
+      history: [...delivered.history, historyEntry('RETURNED', 'DELIVERED')],
+    });
+    const fetchMock = installedFetch((url, init) => {
+      if (url === '/api/orders/order-1/status' && init?.method === 'POST') {
+        return jsonResponse(200, { success: true, data: returned });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: delivered });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+    expect(screen.queryByRole('button', { name: 'Edit order' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Mark returned' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mark this order as returned?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Mark returned' }));
+
+    expect(await screen.findByText('Order moved to Returned.')).toBeVisible();
+
+    const statusCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/orders/order-1/status' &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(JSON.parse(String((statusCall?.[1] as RequestInit).body))).toEqual({
+      status: 'RETURNED',
+      version: 5,
+      note: null,
+    });
+  });
+
   it('shows a not-found message when the order cannot be loaded', async () => {
     installedFetch((url) => {
       if (url === '/api/orders/order-1') {

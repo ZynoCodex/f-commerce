@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_LINE_QUANTITY,
   MAX_MONEY_INPUT,
+  ORDER_ACTIVE_STATUSES,
   ORDER_STATUS_LABEL,
   computeOrderTotals,
   effectiveLinePrice,
@@ -33,6 +34,11 @@ function line(overrides: Partial<OrderLineState> = {}): OrderLineState {
 }
 
 describe('order workflow helpers', () => {
+  // covers AC-14: the list opens on the four working statuses
+  it('keeps the four active statuses in workflow order', () => {
+    expect(ORDER_ACTIVE_STATUSES).toEqual(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED']);
+  });
+
   it('follows the allowed status transitions', () => {
     expect(nextOrderStatuses('PENDING')).toEqual(['CONFIRMED', 'CANCELLED']);
     expect(nextOrderStatuses('CONFIRMED')).toEqual(['PROCESSING', 'CANCELLED']);
@@ -143,5 +149,23 @@ describe('computeOrderTotals', () => {
     expect(totals.deliveryFee).toBe(0);
     expect(totals.discount).toBe(5);
     expect(totals.total).toBe(4995);
+  });
+
+  // covers AC-4: an empty form previews zero rather than a broken total
+  it('previews zero for an order with no lines', () => {
+    expect(computeOrderTotals([], '', '')).toEqual({
+      subtotal: 0,
+      deliveryFee: 0,
+      discount: 0,
+      total: 0,
+      everyLineValid: true,
+    });
+  });
+
+  // covers AC-4: a bad quantity or price never becomes a line total
+  it('returns no line total when the quantity or price is invalid', () => {
+    expect(lineSubtotal(line({ quantity: '0' }))).toBeNull();
+    expect(lineSubtotal(line({ unitPrice: '-1' }))).toBeNull();
+    expect(lineSubtotal(line({ unitPrice: '0' }))).toBe(0);
   });
 });

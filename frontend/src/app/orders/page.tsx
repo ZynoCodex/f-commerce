@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search, ShoppingBag } from 'lucide-react';
 import type { OrderStatusType, OrderSummaryDto } from '@f-commerce/contracts';
@@ -59,6 +59,12 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [currency, setCurrency] = useState('');
+  const requestEpoch = useRef(0);
+
+  /** Invalidate any in flight page request when the list view changes. */
+  const invalidateListRequests = () => {
+    requestEpoch.current += 1;
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
@@ -111,6 +117,7 @@ export default function OrdersPage() {
 
   const loadMore = async () => {
     if (nextCursor === null || isLoading) return;
+    const epoch = requestEpoch.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -120,18 +127,21 @@ export default function OrdersPage() {
         limit: PAGE_SIZE,
         cursor: nextCursor,
       });
+      if (epoch !== requestEpoch.current) return;
       setRows((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (err) {
+      if (epoch !== requestEpoch.current) return;
       setError(err instanceof Error ? err.message : 'Orders could not be loaded');
     } finally {
-      setIsLoading(false);
+      if (epoch === requestEpoch.current) setIsLoading(false);
     }
   };
 
   const filtersActive = filter !== 'active' || debouncedQuery.trim() !== '';
 
   const clearFilters = () => {
+    invalidateListRequests();
     setFilter('active');
     setQuery('');
     setDebouncedQuery('');
@@ -143,6 +153,7 @@ export default function OrdersPage() {
 
   const changeFilter = (next: StatusFilter) => {
     if (next === filter) return;
+    invalidateListRequests();
     setFilter(next);
     setRows([]);
     setNextCursor(null);
@@ -151,6 +162,7 @@ export default function OrdersPage() {
   };
 
   const retry = () => {
+    invalidateListRequests();
     setRows([]);
     setNextCursor(null);
     setIsLoading(true);
@@ -270,6 +282,7 @@ export default function OrdersPage() {
                     className="pl-10"
                     id="order-search"
                     onChange={(event) => {
+                      invalidateListRequests();
                       setQuery(event.target.value);
                       setRows([]);
                       setNextCursor(null);
