@@ -1,7 +1,7 @@
 # 0007. Orders with a strict status workflow
 
 **Date**: 2026-10-22
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -90,56 +90,56 @@ Existing `orders` fields keep their meaning. `customer_id` stays nullable in the
 
 **State transitions**:
 
-| From        | Allowed to              |
-| ----------- | ----------------------- |
-| `PENDING`   | `CONFIRMED`, `CANCELLED` |
-| `CONFIRMED` | `PROCESSING`, `CANCELLED` |
-| `PROCESSING`| `SHIPPED`, `CANCELLED`   |
-| `SHIPPED`   | `DELIVERED`, `RETURNED`  |
-| `DELIVERED` | `RETURNED`               |
-| `CANCELLED` | none                    |
-| `RETURNED`  | none                    |
+| From         | Allowed to                |
+| ------------ | ------------------------- |
+| `PENDING`    | `CONFIRMED`, `CANCELLED`  |
+| `CONFIRMED`  | `PROCESSING`, `CANCELLED` |
+| `PROCESSING` | `SHIPPED`, `CANCELLED`    |
+| `SHIPPED`    | `DELIVERED`, `RETURNED`   |
+| `DELIVERED`  | `RETURNED`                |
+| `CANCELLED`  | none                      |
+| `RETURNED`   | none                      |
 
 Every successful move appends one history row. Edits are allowed only in `PENDING` and `CONFIRMED`.
 
 **API surface**:
 
-| Endpoint                    | Method | Key inputs                                                                                      | Key outputs                                              | Auth                     | Key errors                                              |
-| --------------------------- | ------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------ | ------------------------------------------------------- |
-| `/api/orders`               | POST   | customerId, items, source (required), deliveryFee, discount, shippingAddress, notes, confirmDuplicate, Idempotency-Key | full order with items and history                         | bearer, OWNER or STAFF   | 400 validation, 409 CUSTOMER_ARCHIVED, 409 DUPLICATE_ORDER |
-| `/api/orders`               | GET    | status list, q, cursor, limit                                                                    | rows with nextCursor                                      | bearer, OWNER or STAFF   | 400 validation                                           |
-| `/api/orders/:id`           | GET    | id                                                                                              | full order with items and history                         | bearer, OWNER or STAFF   | 404 NOT_FOUND                                            |
-| `/api/orders/:id`           | PATCH  | version (required), customerId, items (optional lineId per line), deliveryFee, discount, shippingAddress, source, notes | full order                                                | bearer, OWNER or STAFF   | 400 validation, 404, 409 ORDER_LOCKED, 409 ORDER_CHANGED |
-| `/api/orders/:id/status`    | POST   | status, version (required), note                                                                | full order                                                | bearer, OWNER or STAFF   | 404, 409 ORDER_CHANGED, 409 INVALID_STATUS_TRANSITION    |
+| Endpoint                 | Method | Key inputs                                                                                                              | Key outputs                       | Auth                   | Key errors                                                 |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------- | ---------------------------------------------------------- |
+| `/api/orders`            | POST   | customerId, items, source (required), deliveryFee, discount, shippingAddress, notes, confirmDuplicate, Idempotency-Key  | full order with items and history | bearer, OWNER or STAFF | 400 validation, 409 CUSTOMER_ARCHIVED, 409 DUPLICATE_ORDER |
+| `/api/orders`            | GET    | status list, q, cursor, limit                                                                                           | rows with nextCursor              | bearer, OWNER or STAFF | 400 validation                                             |
+| `/api/orders/:id`        | GET    | id                                                                                                                      | full order with items and history | bearer, OWNER or STAFF | 404 NOT_FOUND                                              |
+| `/api/orders/:id`        | PATCH  | version (required), customerId, items (optional lineId per line), deliveryFee, discount, shippingAddress, source, notes | full order                        | bearer, OWNER or STAFF | 400 validation, 404, 409 ORDER_LOCKED, 409 ORDER_CHANGED   |
+| `/api/orders/:id/status` | POST   | status, version (required), note                                                                                        | full order                        | bearer, OWNER or STAFF | 404, 409 ORDER_CHANGED, 409 INVALID_STATUS_TRANSITION      |
 
 Error bodies follow the customer convention: an `error` code, a `message`, a `fields` array for validation, and `existingOrder` for a duplicate. The full code list is `VALIDATION_ERROR`, `NOT_FOUND`, `CUSTOMER_ARCHIVED`, `ORDER_LOCKED`, `ORDER_CHANGED`, `INVALID_STATUS_TRANSITION`, and `DUPLICATE_ORDER`.
 
 **Value sourcing**:
 
-| Action              | Value produced or displayed        | Source                                                                 |
-| ------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
-| Create              | Order number                       | `business_order_counters.last_number` incremented in the same transaction, seeded by the migration |
-| Create              | Customer name and phone snapshots  | `customers.name` and `customers.phone` at creation                      |
-| Edit                | Customer snapshots after a buyer change | The new customer's `customers.name` and `customers.phone`          |
-| Create and edit     | Shipping address prefill and value | `customers.address` in the screen, then the client input; omitted or blank stores null |
-| Create              | Product name and cost snapshots    | `products` or the variant override in `product_variants`                |
-| Edit, existing line | Product name and cost              | The line's stored `product_name_snapshot` and `cost_snapshot`            |
-| Create              | Unit price                         | Client `unitPrice` override, else the variant price, else the product price |
-| Edit, existing line | Unit price                         | Client `unitPrice`, else the line's stored `price_snapshot`              |
-| Create and edit     | Variant label                      | The product option names and the variant combination, or the stored label for an existing line |
-| Create and edit     | Line position                      | The request array order after merging, using the first occurrence of a pair |
-| Create and edit     | Line subtotal                      | Derived: quantity times unit price                                     |
-| Create and edit     | Subtotal, total, due amount        | Derived from lines, delivery fee, discount, and paid amount            |
-| Create              | Initial status                     | Fixed `PENDING`                                                        |
-| Create and edit     | Source channel                     | Client select, one of the contract channel values                      |
-| Status change       | Actor display name                 | `users.name` captured into `changed_by_name` when the row is written    |
-| Any write           | Actor and tenant                   | `requestContext` filled by the auth middleware (`userId`, `businessId`) |
-| Any write           | Timestamps                         | Database `now()`, with `updatedAt` bumped on edit and status change     |
-| List                | Item count                         | Derived line count of `order_items` per order                           |
-| List                | Next cursor                        | Encoded `created_at` and `id` of the last row                          |
-| List                | Duplicate window                   | `orders.created_at` compared with the database clock and the 24 hour rule in this spec |
-| Detail and list     | Currency display                   | `businesses.currency` from spec 0004 through `/api/business/me`         |
-| Edit and status     | Version guard                      | `orders.version`                                                       |
+| Action              | Value produced or displayed             | Source                                                                                             |
+| ------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Create              | Order number                            | `business_order_counters.last_number` incremented in the same transaction, seeded by the migration |
+| Create              | Customer name and phone snapshots       | `customers.name` and `customers.phone` at creation                                                 |
+| Edit                | Customer snapshots after a buyer change | The new customer's `customers.name` and `customers.phone`                                          |
+| Create and edit     | Shipping address prefill and value      | `customers.address` in the screen, then the client input; omitted or blank stores null             |
+| Create              | Product name and cost snapshots         | `products` or the variant override in `product_variants`                                           |
+| Edit, existing line | Product name and cost                   | The line's stored `product_name_snapshot` and `cost_snapshot`                                      |
+| Create              | Unit price                              | Client `unitPrice` override, else the variant price, else the product price                        |
+| Edit, existing line | Unit price                              | Client `unitPrice`, else the line's stored `price_snapshot`                                        |
+| Create and edit     | Variant label                           | The product option names and the variant combination, or the stored label for an existing line     |
+| Create and edit     | Line position                           | The request array order after merging, using the first occurrence of a pair                        |
+| Create and edit     | Line subtotal                           | Derived: quantity times unit price                                                                 |
+| Create and edit     | Subtotal, total, due amount             | Derived from lines, delivery fee, discount, and paid amount                                        |
+| Create              | Initial status                          | Fixed `PENDING`                                                                                    |
+| Create and edit     | Source channel                          | Client select, one of the contract channel values                                                  |
+| Status change       | Actor display name                      | `users.name` captured into `changed_by_name` when the row is written                               |
+| Any write           | Actor and tenant                        | `requestContext` filled by the auth middleware (`userId`, `businessId`)                            |
+| Any write           | Timestamps                              | Database `now()`, with `updatedAt` bumped on edit and status change                                |
+| List                | Item count                              | Derived line count of `order_items` per order                                                      |
+| List                | Next cursor                             | Encoded `created_at` and `id` of the last row                                                      |
+| List                | Duplicate window                        | `orders.created_at` compared with the database clock and the 24 hour rule in this spec             |
+| Detail and list     | Currency display                        | `businesses.currency` from spec 0004 through `/api/business/me`                                    |
+| Edit and status     | Version guard                           | `orders.version`                                                                                   |
 
 **Key invariants**:
 
@@ -185,15 +185,15 @@ Error bodies follow the customer convention: an `error` code, a `message`, a `fi
 
 Tracer Bullet: stand up a thin create, list, and detail path through the database, API, and UI first, then thicken it with editing, the workflow, duplicate handling, and hardening.
 
-1. Add the migration for the confirmed model: order snapshots and version, order item variant reference, variant label, and position, `order_status_history` with the actor name, `business_order_counters`, both order list indexes, and the counter and snapshot backfills. Update the existing order seeds in the four test files that insert orders. Add the contract schemas, enums, DTOs, and error codes. Satisfies **AC-2**, **AC-3**, **AC-11**, **AC-17**.
-2. Build the thin create path: repository insert with the counter and snapshots, service validation including merged lines, conflicting prices, money caps, and totals, the initial history row, the audit row, and `POST /api/orders`. Satisfies **AC-1**, **AC-2**, **AC-4**, **AC-11**, **AC-17**.
-3. Build the first usable screen thread: `/orders` reading real rows (the first slice of **AC-14**), `/orders/new` creating a working order (the first slice of **AC-15**), and a minimal `/orders/[id]` landing page. Satisfies **AC-3**.
-4. Build detail and timeline: `GET /api/orders/:id` with items ordered by position, stored actor names, and history, then the full detail screen with totals and the timeline. Satisfies **AC-8**, **AC-16**, **AC-18**.
-5. Add list search, status filters, and cursor paging: the query path, line item count, digit only phone search, escaped wildcards, cursor binding, the chip bar, debounced search, and Load more. Satisfies **AC-7**, **AC-14**.
-6. Add edits and concurrency: `PATCH` with full item replacement, `lineId` matching, position, stored price and snapshot rules, the deleted variant case, version handling, no op behavior, the audit row, and edit in place on the detail screen. Satisfies **AC-3**, **AC-9**, **AC-13**, **AC-16**.
-7. Add the status workflow: `POST /api/orders/:id/status` with the transition table, the error precedence order, the stored actor name, history write, conflict handling, and the allowed action controls with the note dialog. Satisfies **AC-10**, **AC-16**, **AC-18**.
-8. Add duplicate and idempotency handling: the key replay before body checks, the two request key race, the best effort 24 hour duplicate query, the 409 body with the existing order, the confirm flag, and the duplicate dialog. Satisfies **AC-5**, **AC-6**, **AC-15**.
-9. Harden the feature: tenant and role coverage, archived reference cases, legacy row behavior, rollback tests, malformed ids and cursors, money boundary cases, empty and error states, keyboard access, and WCAG AA checks. Satisfies **AC-12**, **AC-13**, **AC-17**, **AC-14**, **AC-15**, **AC-16**.
+1. [x] Add the migration for the confirmed model: order snapshots and version, order item variant reference, variant label, and position, `order_status_history` with the actor name, `business_order_counters`, both order list indexes, and the counter and snapshot backfills. Update the existing order seeds in the four test files that insert orders. Add the contract schemas, enums, DTOs, and error codes. Satisfies **AC-2**, **AC-3**, **AC-11**, **AC-17**.
+2. [x] Build the thin create path: repository insert with the counter and snapshots, service validation including merged lines, conflicting prices, money caps, and totals, the initial history row, the audit row, and `POST /api/orders`. Satisfies **AC-1**, **AC-2**, **AC-4**, **AC-11**, **AC-17**.
+3. [x] Build the first usable screen thread: `/orders` reading real rows (the first slice of **AC-14**), `/orders/new` creating a working order (the first slice of **AC-15**), and a minimal `/orders/[id]` landing page. Satisfies **AC-3**.
+4. [x] Build detail and timeline: `GET /api/orders/:id` with items ordered by position, stored actor names, and history, then the full detail screen with totals and the timeline. Satisfies **AC-8**, **AC-16**, **AC-18**.
+5. [x] Add list search, status filters, and cursor paging: the query path, line item count, digit only phone search, escaped wildcards, cursor binding, the chip bar, debounced search, and Load more. Satisfies **AC-7**, **AC-14**.
+6. [x] Add edits and concurrency: `PATCH` with full item replacement, `lineId` matching, position, stored price and snapshot rules, the deleted variant case, version handling, no op behavior, the audit row, and edit in place on the detail screen. Satisfies **AC-3**, **AC-9**, **AC-13**, **AC-16**.
+7. [x] Add the status workflow: `POST /api/orders/:id/status` with the transition table, the error precedence order, the stored actor name, history write, conflict handling, and the allowed action controls with the note dialog. Satisfies **AC-10**, **AC-16**, **AC-18**.
+8. [x] Add duplicate and idempotency handling: the key replay before body checks, the two request key race, the best effort 24 hour duplicate query, the 409 body with the existing order, the confirm flag, and the duplicate dialog. Satisfies **AC-5**, **AC-6**, **AC-15**.
+9. [x] Harden the feature: tenant and role coverage, archived reference cases, legacy row behavior, rollback tests, malformed ids and cursors, money boundary cases, empty and error states, keyboard access, and WCAG AA checks. Satisfies **AC-12**, **AC-13**, **AC-17**, **AC-14**, **AC-15**, **AC-16**.
 
 ## Consequences
 

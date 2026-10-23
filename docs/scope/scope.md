@@ -165,12 +165,13 @@ Order creation from customer/product selection, status states, order history, so
 
 - [x] Design it (spec): `/architect orders`
       Spec [0007](../specs/0007-orders/index.md)
-- [ ] Build it: `/develop orders`
-  - [ ] Data, contracts and migration: snapshots, version, line identity, history, counters, indexes and backfills (AC-2, AC-3, AC-11, AC-17)
-  - [ ] Create path and first screens: transactional create with counter, merging, totals and audit, plus `/orders`, `/orders/new` and a minimal detail page (AC-1, AC-2, AC-4, AC-11, AC-17)
-  - [ ] Detail, timeline, search and paging: stored snapshots, history, status filters, digit phone search, cursor binding and Load more (AC-7, AC-8, AC-14, AC-16, AC-18)
-  - [ ] Edits, concurrency and workflow: `lineId` replacement, version guards, transition table, history rows and in place edit (AC-3, AC-9, AC-10, AC-13, AC-16, AC-18)
-  - [ ] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
+- [x] Build it: `/develop orders`
+  - [x] Data, contracts and migration: snapshots, version, line identity, history, counters, indexes and backfills (AC-2, AC-3, AC-11, AC-17)
+  - [x] Create path and first screens: transactional create with counter, merging, totals and audit, plus `/orders`, `/orders/new` and a minimal detail page (AC-1, AC-2, AC-4, AC-11, AC-17)
+  - [x] Detail, timeline, search and paging: stored snapshots, history, status filters, digit phone search, cursor binding and Load more (AC-7, AC-8, AC-14, AC-16, AC-18)
+  - [x] Edits, concurrency and workflow: `lineId` replacement, version guards, transition table, history rows and in place edit (AC-3, AC-9, AC-10, AC-13, AC-16, AC-18)
+  - [x] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
+        Code in `packages/contracts/src/order.ts`, `backend/src/application/services/order.service.ts`, `backend/src/presentation/controllers/order.controller.ts`, `frontend/src/app/orders/`
 - [ ] Verify it: `/check verify orders`
 - [ ] Test it: `/test orders`
 - [ ] Review it (fresh model): `/check review orders`
