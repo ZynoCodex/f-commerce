@@ -1,0 +1,336 @@
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { OrderDto, OrderStatusType } from '@f-commerce/contracts';
+
+import { ThemeBoundary } from '@/components/theme/theme';
+import { setAuth } from '@/lib/auth-client';
+
+const replaceMock = vi.fn();
+const pushMock = vi.fn();
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/orders/order-1',
+  useRouter: () => ({ replace: replaceMock, push: pushMock }),
+  useParams: () => ({ id: 'order-1' }),
+}));
+
+import OrderDetailPage from './page';
+
+const created = '2026-10-20T10:00:00.000Z';
+const updated = '2026-10-21T11:00:00.000Z';
+const CUSTOMER_ID = '11111111-1111-4111-8111-111111111111';
+const PRODUCT_ID = '22222222-2222-4222-8222-222222222222';
+const LINE_ID = '44444444-4444-4444-8444-444444444444';
+
+function makeOrder(overrides: Partial<OrderDto> = {}): OrderDto {
+  return {
+    id: 'order-1',
+    orderNumber: 'ORD-0001',
+    status: 'PENDING',
+    source: 'FACEBOOK',
+    customerId: CUSTOMER_ID,
+    customerName: 'Nusrat Jahan',
+    customerPhone: '+8801712345678',
+    shippingAddress: '12 Lake Road',
+    notes: 'Call first',
+    subtotal: 7500,
+    deliveryFee: 100,
+    discount: 50,
+    total: 7550,
+    paidAmount: 0,
+    dueAmount: 7550,
+    version: 1,
+    createdAt: created,
+    updatedAt: created,
+    items: [
+      {
+        id: LINE_ID,
+        productId: PRODUCT_ID,
+        variantId: null,
+        productName: 'Cotton shirt',
+        variantLabel: null,
+        price: 2500,
+        cost: 1500,
+        quantity: 3,
+        subtotal: 7500,
+        position: 0,
+      },
+    ],
+    history: [
+      {
+        id: 'history-1',
+        fromStatus: null,
+        toStatus: 'PENDING',
+        note: null,
+        changedByName: 'Maya Owner',
+        createdAt: created,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function historyEntry(
+  status: OrderStatusType,
+  fromStatus: OrderStatusType | null,
+  note: string | null = null,
+) {
+  return {
+    id: `history-${status}`,
+    fromStatus,
+    toStatus: status,
+    note,
+    changedByName: 'Maya Owner',
+    createdAt: updated,
+  };
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function installedFetch(
+  handler: (url: string, init?: RequestInit) => Response | undefined,
+): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+    Promise.resolve(
+      handler(String(input), init) ??
+        jsonResponse(404, { error: 'NOT_FOUND', message: 'Not found' }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function metadata(url: string): Response | undefined {
+  if (url === '/api/business/me') {
+    return jsonResponse(200, { success: true, data: { currency: 'BDT' } });
+  }
+  return undefined;
+}
+
+function renderPage() {
+  return render(
+    <ThemeBoundary>
+      <OrderDetailPage />
+    </ThemeBoundary>,
+  );
+}
+
+describe('OrderDetailPage', () => {
+  beforeEach(() => {
+    replaceMock.mockReset();
+    pushMock.mockReset();
+    setAuth({ accessToken: 'tok', businessId: 'biz-1' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders the order, items, totals, and status timeline', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: makeOrder() });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'ORD-0001' })).toBeVisible();
+    expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nusrat Jahan').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /\+8801712345678/ })).toHaveAttribute(
+      'href',
+      'tel:+8801712345678',
+    );
+    expect(screen.getAllByText('Cotton shirt').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('7,550 BDT').length).toBeGreaterThan(0);
+    expect(screen.getByText('Created as Pending')).toBeVisible();
+    expect(screen.getByText('by Maya Owner')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit order' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Confirm order' })).toBeVisible();
+  });
+
+  it('moves the order through a status change with a note', async () => {
+    const user = userEvent.setup();
+    const confirmed = makeOrder({
+      status: 'CONFIRMED',
+      version: 2,
+      updatedAt: updated,
+      history: [makeOrder().history[0], historyEntry('CONFIRMED', 'PENDING', 'Paid in full')],
+    });
+    const fetchMock = installedFetch((url, init) => {
+      if (url === '/api/orders/order-1/status' && init?.method === 'POST') {
+        return jsonResponse(200, { success: true, data: confirmed });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: makeOrder() });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Confirm order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mark as confirmed?' });
+    expect(within(dialog).getByText(/moves ORD-0001 from Pending to Confirmed/)).toBeVisible();
+
+    await user.type(within(dialog).getByLabelText('Note'), 'Paid in full');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm order' }));
+
+    expect(await screen.findByText('Order moved to Confirmed.')).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const statusCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/orders/order-1/status' &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(statusCall).toBeDefined();
+    expect(JSON.parse(String((statusCall?.[1] as RequestInit).body))).toEqual({
+      status: 'CONFIRMED',
+      version: 1,
+      note: 'Paid in full',
+    });
+  });
+
+  it('saves an edit with the existing line ids and version', async () => {
+    const user = userEvent.setup();
+    const edited = makeOrder({
+      notes: 'Leave at the desk',
+      version: 2,
+      updatedAt: updated,
+    });
+    const fetchMock = installedFetch((url, init) => {
+      if (url === '/api/orders/order-1' && init?.method === 'PATCH') {
+        return jsonResponse(200, { success: true, data: edited });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: makeOrder() });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit order' }));
+    expect(await screen.findByRole('heading', { name: 'Edit ORD-0001' })).toBeVisible();
+    expect(screen.getByText('Saved line')).toBeVisible();
+
+    const notes = screen.getByLabelText('Notes');
+    await user.clear(notes);
+    await user.type(notes, 'Leave at the desk');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Order updated.')).toBeVisible();
+
+    const patchCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/orders/order-1' &&
+        (init as RequestInit | undefined)?.method === 'PATCH',
+    );
+    expect(patchCall).toBeDefined();
+    expect(JSON.parse(String((patchCall?.[1] as RequestInit).body))).toEqual({
+      version: 1,
+      customerId: CUSTOMER_ID,
+      items: [
+        {
+          lineId: LINE_ID,
+          productId: PRODUCT_ID,
+          variantId: null,
+          quantity: 3,
+          unitPrice: 2500,
+        },
+      ],
+      deliveryFee: 100,
+      discount: 50,
+      shippingAddress: '12 Lake Road',
+      notes: 'Leave at the desk',
+      source: 'FACEBOOK',
+    });
+  });
+
+  it('locks edits after processing starts and shows only allowed moves', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, {
+          success: true,
+          data: makeOrder({
+            status: 'PROCESSING',
+            history: [
+              makeOrder().history[0],
+              historyEntry('CONFIRMED', 'PENDING'),
+              historyEntry('PROCESSING', 'CONFIRMED'),
+            ],
+          }),
+        });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+    expect(screen.queryByRole('button', { name: 'Edit order' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark shipped' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Cancel order' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Confirm order' })).not.toBeInTheDocument();
+  });
+
+  it('shows a not-found message when the order cannot be loaded', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(404, { error: 'NOT_FOUND', message: 'Order not found' });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Order not found')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+  });
+
+  it('reloads and explains when the order changed elsewhere', async () => {
+    const user = userEvent.setup();
+    let order = makeOrder();
+    installedFetch((url, init) => {
+      if (url === '/api/orders/order-1/status' && init?.method === 'POST') {
+        order = makeOrder({
+          status: 'CONFIRMED',
+          version: 2,
+          history: [makeOrder().history[0], historyEntry('CONFIRMED', 'PENDING')],
+        });
+        return jsonResponse(409, {
+          error: 'ORDER_CHANGED',
+          message: 'This order changed since you loaded it.',
+        });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: order });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Confirm order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mark as confirmed?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm order' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('This order changed elsewhere. The newest state is shown.'),
+      ).toBeVisible();
+    });
+    expect(await screen.findByRole('button', { name: 'Start processing' })).toBeVisible();
+  });
+});
