@@ -11,6 +11,7 @@ import {
 import { authRouter } from './presentation/controllers/auth.controller.js';
 import { businessRouter } from './presentation/controllers/business.controller.js';
 import { customerRouter } from './presentation/controllers/customer.controller.js';
+import { orderRouter } from './presentation/controllers/order.controller.js';
 import { categoryRouter } from './presentation/controllers/category.controller.js';
 import { productRouter } from './presentation/controllers/product.controller.js';
 import {
@@ -51,6 +52,7 @@ app.use('/api/auth/refresh', refreshRateLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/business', businessRouter);
 app.use('/api/customers', customerRouter);
+app.use('/api/orders', orderRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/products', productRouter);
 

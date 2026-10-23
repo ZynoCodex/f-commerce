@@ -160,3 +160,43 @@ export class DuplicateCategoryError extends ConflictError {
     super(message);
   }
 }
+
+// --- Order errors ---
+
+export class OrderLockedError extends ConflictError {
+  constructor(message: string = 'This order can no longer be edited') {
+    super(message);
+  }
+}
+
+export class OrderChangedError extends ConflictError {
+  constructor(message: string = 'This order was changed by someone else') {
+    super(message);
+  }
+}
+
+export class InvalidStatusTransitionError extends ConflictError {
+  constructor(
+    public readonly fromStatus: string,
+    public readonly toStatus: string,
+  ) {
+    super(`Cannot move an order from ${fromStatus} to ${toStatus}`);
+  }
+}
+
+export interface DuplicateOrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  createdAt: Date;
+}
+
+export class DuplicateOrderError extends ConflictError {
+  constructor(
+    public readonly existingOrder: DuplicateOrderSummary,
+    message: string = 'A similar order was created in the last 24 hours',
+  ) {
+    super(message);
+  }
+}
