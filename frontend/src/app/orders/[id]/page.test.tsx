@@ -33,6 +33,7 @@ function makeOrder(overrides: Partial<OrderDto> = {}): OrderDto {
     customerPhone: '+8801712345678',
     shippingAddress: '12 Lake Road',
     notes: 'Call first',
+    deliveryDeadline: '2026-11-05',
     subtotal: 7500,
     deliveryFee: 100,
     discount: 50,
@@ -254,6 +255,7 @@ describe('OrderDetailPage', () => {
       shippingAddress: '12 Lake Road',
       notes: 'Leave at the desk',
       source: 'FACEBOOK',
+      deliveryDeadline: '2026-11-05',
     });
   });
 

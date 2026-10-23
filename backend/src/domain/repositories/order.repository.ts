@@ -38,6 +38,7 @@ export interface OrderCreateData {
   dueAmount: number;
   shippingAddress: string | null;
   notes: string | null;
+  deliveryDeadline: string | null;
   idempotencyKey: string | null;
 }
 
@@ -67,6 +68,7 @@ export interface OrderUpdateData {
   dueAmount?: number;
   shippingAddress?: string | null;
   notes?: string | null;
+  deliveryDeadline?: string | null;
 }
 
 export interface OrderAuditEntry {

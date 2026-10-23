@@ -115,6 +115,7 @@ function toOrderDto(detail: OrderDetail): OrderDto {
     customerPhone: order.customerPhoneSnapshot,
     shippingAddress: order.shippingAddress ?? null,
     notes: order.notes ?? null,
+    deliveryDeadline: order.deliveryDeadline ?? null,
     subtotal: order.subtotal,
     deliveryFee: order.deliveryFee,
     discount: order.discount,
@@ -144,6 +145,7 @@ function toSummaryDto(summary: {
   total: number;
   dueAmount: number;
   source?: string;
+  deliveryDeadline?: string;
   itemCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -156,6 +158,7 @@ function toSummaryDto(summary: {
     total: summary.total,
     dueAmount: summary.dueAmount,
     source: toSource(summary.source),
+    deliveryDeadline: summary.deliveryDeadline ?? null,
     itemCount: summary.itemCount,
     createdAt: summary.createdAt.toISOString(),
     updatedAt: summary.updatedAt.toISOString(),
@@ -253,6 +256,7 @@ export class OrderService {
           dueAmount: totals.total,
           shippingAddress: input.shippingAddress,
           notes: input.notes,
+          deliveryDeadline: input.deliveryDeadline,
           idempotencyKey,
         },
         items,
@@ -389,6 +393,13 @@ export class OrderService {
     if (input.notes !== undefined && input.notes !== (order.notes ?? null)) {
       changes.notes = input.notes;
       changedFields.push('notes');
+    }
+    if (
+      input.deliveryDeadline !== undefined &&
+      input.deliveryDeadline !== (order.deliveryDeadline ?? null)
+    ) {
+      changes.deliveryDeadline = input.deliveryDeadline;
+      changedFields.push('deliveryDeadline');
     }
 
     if (changedFields.length === 0) {

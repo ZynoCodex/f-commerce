@@ -70,6 +70,7 @@ function toOrder(row: typeof orders.$inferSelect): Order {
     trackingNumber: row.trackingNumber ?? undefined,
     source: row.source ?? undefined,
     notes: row.notes ?? undefined,
+    deliveryDeadline: row.deliveryDeadline ?? undefined,
     idempotencyKey: row.idempotencyKey ?? undefined,
     version: row.version,
     businessId: row.businessId,
@@ -119,6 +120,7 @@ function toSummary(row: {
   total: number;
   dueAmount: number;
   source: string | null;
+  deliveryDeadline: string | null;
   itemCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -131,6 +133,7 @@ function toSummary(row: {
     total: row.total,
     dueAmount: row.dueAmount,
     source: row.source ?? undefined,
+    deliveryDeadline: row.deliveryDeadline ?? undefined,
     itemCount: Number(row.itemCount),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -236,6 +239,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
         total: orders.total,
         dueAmount: orders.dueAmount,
         source: orders.source,
+        deliveryDeadline: orders.deliveryDeadline,
         itemCount: ORDER_ITEM_COUNT,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
@@ -263,6 +267,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
         total: orders.total,
         dueAmount: orders.dueAmount,
         source: orders.source,
+        deliveryDeadline: orders.deliveryDeadline,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         pairs: sql<string[]>`(
@@ -410,6 +415,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
           shippingAddress: data.shippingAddress,
           source: data.source,
           notes: data.notes,
+          deliveryDeadline: data.deliveryDeadline,
           idempotencyKey: data.idempotencyKey,
           version: 1,
           createdAt: now,

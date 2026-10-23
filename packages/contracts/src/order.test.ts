@@ -38,6 +38,7 @@ describe('order create contract', () => {
       shippingAddress: null,
       notes: null,
       confirmDuplicate: false,
+      deliveryDeadline: null,
     });
   });
 
@@ -141,6 +142,32 @@ describe('order create contract', () => {
     expect(atTheCap.success).toBe(true);
     expect(OrderCreateSchema.safeParse(baseCreate({ items })).success).toBe(true);
   });
+  // covers AC-19: an omitted value stays null on create while a blank or null also stores null
+  it('treats an omitted, null, and blank delivery deadline as null on create', () => {
+    expect(OrderCreateSchema.parse(baseCreate()).deliveryDeadline).toBeNull();
+    expect(
+      OrderCreateSchema.parse(baseCreate({ deliveryDeadline: null })).deliveryDeadline,
+    ).toBeNull();
+    expect(
+      OrderCreateSchema.parse(baseCreate({ deliveryDeadline: '   ' })).deliveryDeadline,
+    ).toBeNull();
+  });
+
+  // covers AC-19: a real calendar day is accepted and a day that does not exist is rejected
+  it('accepts a real delivery deadline and rejects an impossible calendar day', () => {
+    expect(
+      OrderCreateSchema.parse(baseCreate({ deliveryDeadline: '2026-11-05' })).deliveryDeadline,
+    ).toBe('2026-11-05');
+    expect(
+      OrderCreateSchema.safeParse(baseCreate({ deliveryDeadline: '2026-02-30' })).success,
+    ).toBe(false);
+    expect(
+      OrderCreateSchema.safeParse(baseCreate({ deliveryDeadline: '2026-13-01' })).success,
+    ).toBe(false);
+    expect(OrderCreateSchema.safeParse(baseCreate({ deliveryDeadline: '2026-1-1' })).success).toBe(
+      false,
+    );
+  });
 });
 
 describe('order edit contract', () => {
@@ -153,6 +180,23 @@ describe('order edit contract', () => {
     const cleared = OrderUpdateSchema.parse({ version: 2, shippingAddress: '   ', notes: null });
     expect(cleared.shippingAddress).toBeNull();
     expect(cleared.notes).toBeNull();
+  });
+
+  // covers AC-19: an omitted delivery deadline is unchanged while a blank or null clears it
+  it('keeps an omitted delivery deadline absent and clears it on blank or null', () => {
+    expect(OrderUpdateSchema.parse({ version: 2 }).deliveryDeadline).toBeUndefined();
+    expect(
+      OrderUpdateSchema.parse({ version: 2, deliveryDeadline: '' }).deliveryDeadline,
+    ).toBeNull();
+    expect(
+      OrderUpdateSchema.parse({ version: 2, deliveryDeadline: null }).deliveryDeadline,
+    ).toBeNull();
+    expect(
+      OrderUpdateSchema.parse({ version: 2, deliveryDeadline: '2026-11-05' }).deliveryDeadline,
+    ).toBe('2026-11-05');
+    expect(
+      OrderUpdateSchema.safeParse({ version: 2, deliveryDeadline: '2026-02-30' }).success,
+    ).toBe(false);
   });
 
   // covers AC-11: the edit limit is measured after trimming too
@@ -280,6 +324,7 @@ describe('order response contracts', () => {
       customerPhone: '+8801712345678',
       shippingAddress: null,
       notes: null,
+      deliveryDeadline: null,
       subtotal: 2500,
       deliveryFee: 100,
       discount: 50,
@@ -329,6 +374,7 @@ describe('order response contracts', () => {
       total: 2550,
       dueAmount: 2550,
       source: null,
+      deliveryDeadline: null,
       itemCount: 1,
       createdAt: '2026-10-20T10:00:00.000Z',
       updatedAt: '2026-10-20T10:00:00.000Z',

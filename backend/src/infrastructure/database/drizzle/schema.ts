@@ -7,6 +7,7 @@ import {
   boolean,
   integer,
   jsonb,
+  date,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -220,6 +221,9 @@ export const orders = pgTable(
     trackingNumber: text('tracking_number'),
     source: text('source'),
     notes: text('notes'),
+    // A promise is a day, not a moment. String mode keeps it a YYYY-MM-DD
+    // value so it never becomes a Date and never shifts by timezone.
+    deliveryDeadline: date('delivery_deadline', { mode: 'string' }),
     idempotencyKey: text('idempotency_key'),
     version: integer('version').notNull().default(1),
     ...timestamps,

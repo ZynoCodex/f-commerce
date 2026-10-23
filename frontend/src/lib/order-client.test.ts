@@ -24,6 +24,7 @@ function makeOrder(overrides: Partial<OrderDto> = {}): OrderDto {
     customerPhone: '+8801712345678',
     shippingAddress: null,
     notes: null,
+    deliveryDeadline: null,
     subtotal: 2500,
     deliveryFee: 0,
     discount: 0,
@@ -141,6 +142,7 @@ describe('order requests', () => {
       discount: 0,
       shippingAddress: null,
       notes: null,
+      deliveryDeadline: null,
       confirmDuplicate: false,
     };
 
@@ -237,6 +239,7 @@ describe('order errors', () => {
         discount: 0,
         shippingAddress: null,
         notes: null,
+        deliveryDeadline: null,
         confirmDuplicate: false,
       },
       'key-1',
@@ -305,6 +308,7 @@ describe('order errors', () => {
         discount: 0,
         shippingAddress: null,
         notes: null,
+        deliveryDeadline: null,
         confirmDuplicate: false,
       },
       'key-1',

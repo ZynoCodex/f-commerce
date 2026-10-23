@@ -66,6 +66,7 @@ function makeOrder(overrides: Partial<OrderDto> = {}): OrderDto {
     customerPhone: customer.phone,
     shippingAddress: customer.address,
     notes: null,
+    deliveryDeadline: null,
     subtotal: 5000,
     deliveryFee: 100,
     discount: 50,
@@ -213,6 +214,7 @@ describe('NewOrderPage', () => {
       discount: 50,
       shippingAddress: '12 Lake Road',
       notes: null,
+      deliveryDeadline: null,
       confirmDuplicate: false,
     });
   });

@@ -25,7 +25,7 @@ import {
 import { CustomerPicker } from '@/components/orders/customer-picker';
 import { ProductPicker } from '@/components/orders/product-picker';
 import { isTimeoutError } from '@/lib/auth-client';
-import { formatDateTime, formatMoney } from '@/lib/catalog-format';
+import { formatDateTime, formatMoney, localToday } from '@/lib/catalog-format';
 import { OrderApiError, createOrder, updateOrder } from '@/lib/order-client';
 import {
   MAX_LINE_QUANTITY,
@@ -60,6 +60,7 @@ const FIELD_MESSAGES: Record<string, string> = {
   discount: 'Enter a whole amount from 0 to 100,000,000.',
   shippingAddress: 'Keep the address to 500 characters or fewer.',
   notes: 'Keep notes to 500 characters or fewer.',
+  deliveryDeadline: 'Enter a real calendar date.',
   total: 'The order total is above the allowed limit.',
 };
 
@@ -103,6 +104,23 @@ function makeIdempotencyKey(): string {
   return `order-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * A native date input yields `YYYY-MM-DD`, so the day is kept as text and
+ * checked against the month lengths. This rejects `2026-02-30` and
+ * `2026-13-01` without turning the value into a `Date`.
+ */
+function isRealCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day <= daysInMonth;
+}
+
 /** Shared create and edit form. The page owns the heading and navigation. */
 export function OrderForm({
   mode,
@@ -121,6 +139,7 @@ export function OrderForm({
   const [discount, setDiscount] = useState(order ? String(order.discount) : '');
   const [shippingAddress, setShippingAddress] = useState(order?.shippingAddress ?? '');
   const [notes, setNotes] = useState(order?.notes ?? '');
+  const [deliveryDeadline, setDeliveryDeadline] = useState(order?.deliveryDeadline ?? '');
 
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -132,6 +151,10 @@ export function OrderForm({
 
   const totals = computeOrderTotals(lines, deliveryFee, discount);
   const discountTooHigh = totals.discount > totals.subtotal + totals.deliveryFee;
+  const deadlineInPast =
+    deliveryDeadline !== '' &&
+    isRealCalendarDate(deliveryDeadline) &&
+    deliveryDeadline < localToday();
 
   const fieldError = (field: string): string | undefined =>
     fieldErrors.includes(field) ? FIELD_MESSAGES[field] : undefined;
@@ -212,6 +235,9 @@ export function OrderForm({
     if (discountValue === null) errors.push('discount');
     if (shippingAddress.length > 500) errors.push('shippingAddress');
     if (notes.length > 500) errors.push('notes');
+    if (deliveryDeadline !== '' && !isRealCalendarDate(deliveryDeadline)) {
+      errors.push('deliveryDeadline');
+    }
 
     const preview = computeOrderTotals(lines, deliveryFee, discount);
     if (
@@ -256,6 +282,7 @@ export function OrderForm({
         discount: discountValue ?? 0,
         shippingAddress,
         notes,
+        deliveryDeadline,
         confirmDuplicate,
       } satisfies OrderCreateRequest);
       if (!parsed.success) {
@@ -289,6 +316,7 @@ export function OrderForm({
         shippingAddress,
         notes,
         source,
+        deliveryDeadline,
       } satisfies OrderUpdateRequest);
       if (!parsed.success) {
         applyIssues(parsed.error.issues);
@@ -588,6 +616,28 @@ export function OrderForm({
                   value={shippingAddress}
                 />
               </Field>
+            </div>
+
+            <div className="sm:col-span-2">
+              <Field
+                description="The day you promised the buyer. Leave it empty when there is no promise."
+                error={fieldError('deliveryDeadline')}
+                htmlFor="order-delivery-deadline"
+                label="Delivery deadline"
+              >
+                <Input
+                  disabled={isSaving}
+                  id="order-delivery-deadline"
+                  onChange={(event) => setDeliveryDeadline(event.target.value)}
+                  type="date"
+                  value={deliveryDeadline}
+                />
+              </Field>
+              {deadlineInPast && (
+                <p className="mt-2 text-caption text-warning" role="status">
+                  This date has already passed. You can still save the order.
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">

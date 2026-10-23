@@ -41,6 +41,7 @@ export interface Order extends TenantEntity {
   trackingNumber?: string;
   source?: string; // one of the contract channel values
   notes?: string;
+  deliveryDeadline?: string; // YYYY-MM-DD, the promised delivery date
   idempotencyKey?: string;
   version: number;
 }
@@ -86,6 +87,7 @@ export interface OrderSummary {
   total: number;
   dueAmount: number;
   source?: string;
+  deliveryDeadline?: string; // YYYY-MM-DD, the promised delivery date
   itemCount: number;
   createdAt: Date;
   updatedAt: Date;

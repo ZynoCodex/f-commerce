@@ -86,6 +86,39 @@ const editOptionalText = z
     return value === '' ? null : value;
   });
 
+/**
+ * A promised delivery date travels as `YYYY-MM-DD` and stays a plain string,
+ * so it is never turned into a JavaScript Date and never shifts by timezone.
+ * `z.iso.date()` rejects an impossible calendar day such as `2026-02-30`.
+ */
+const isoDateSchema = z.iso.date('Must be a real calendar date in YYYY-MM-DD');
+
+/**
+ * The blank rule runs before the date check: `z.iso.date()` rejects an empty
+ * string, so an omitted, null, or blank create value becomes null first.
+ */
+const createOptionalDate = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((value) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  })
+  .pipe(isoDateSchema.nullable());
+
+/** Edit keeps an omitted date unchanged, while null or blank clears it. */
+const editOptionalDate = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((value) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  })
+  .pipe(isoDateSchema.nullable().optional());
+
 /** One line in a create request. Lines with the same pair are merged server side. */
 export const OrderItemInputSchema = z.object({
   productId: z.string().uuid(),
@@ -107,6 +140,7 @@ export const OrderCreateSchema = z.object({
   discount: moneyInput.optional().default(0),
   shippingAddress: createOptionalText,
   notes: createOptionalText,
+  deliveryDeadline: createOptionalDate,
   confirmDuplicate: z.boolean().optional().default(false),
 });
 
@@ -119,6 +153,7 @@ export const OrderUpdateSchema = z.object({
   shippingAddress: editOptionalText,
   notes: editOptionalText,
   source: OrderSourceSchema.optional(),
+  deliveryDeadline: editOptionalDate,
 });
 
 export const OrderStatusChangeSchema = z.object({
@@ -168,6 +203,7 @@ export const OrderSchema = z.object({
   customerPhone: z.string(),
   shippingAddress: z.string().nullable(),
   notes: z.string().nullable(),
+  deliveryDeadline: z.iso.date().nullable(),
   subtotal: z.number().int(),
   deliveryFee: z.number().int(),
   discount: z.number().int(),
@@ -189,6 +225,7 @@ export const OrderSummarySchema = z.object({
   total: z.number().int(),
   dueAmount: z.number().int(),
   source: OrderSourceSchema.nullable(),
+  deliveryDeadline: z.iso.date().nullable(),
   itemCount: z.number().int(),
   createdAt: z.string(),
   updatedAt: z.string(),

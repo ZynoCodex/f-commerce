@@ -1476,6 +1476,140 @@ describe('order routes against PostgreSQL', () => {
     });
   });
 
+  describe('delivery deadline (AC-1, AC-7, AC-8, AC-9, AC-11, AC-17, AC-19)', () => {
+    it('stores an omitted, null, and blank deadline as null and a real date as sent', async () => {
+      const omitted = await createOrder(baseOrder());
+      expect(omitted.body.data.deliveryDeadline).toBeNull();
+
+      const blank = await createOrder(
+        baseOrder({ customerId: fixtures.secondCustomerId, deliveryDeadline: '   ' }),
+      );
+      expect(blank.body.data.deliveryDeadline).toBeNull();
+
+      const dated = await createOrder(
+        baseOrder({ deliveryDeadline: '2026-11-05', confirmDuplicate: true }),
+      );
+      expect(dated.body.data.deliveryDeadline).toBe('2026-11-05');
+      expect(dated.body.data.version).toBe(1);
+
+      const row = await findOrder(dated.body.data.id);
+      expect(row.deliveryDeadline).toBe('2026-11-05');
+    });
+
+    it('accepts a past date and rejects an impossible calendar day without writing', async () => {
+      const before = await countOrders();
+      const past = await createOrder(baseOrder({ deliveryDeadline: '2020-01-01' }));
+      expect(past.status).toBe(201);
+      expect(past.body.data.deliveryDeadline).toBe('2020-01-01');
+
+      for (const value of ['2026-02-30', '2026-13-01', '2026-1-1']) {
+        const bad = await createOrder(baseOrder({ deliveryDeadline: value }));
+        expect(bad.status).toBe(400);
+        expect(bad.body.error).toBe('VALIDATION_ERROR');
+        expect(bad.body.fields).toContain('deliveryDeadline');
+      }
+      expect(await countOrders()).toBe(before + 1);
+    });
+
+    it('carries the deadline on the list row and the detail', async () => {
+      const created = await createOrder(baseOrder({ deliveryDeadline: '2026-11-05' }));
+      const orderId = created.body.data.id;
+
+      const list = await request(app).get('/api/orders?status=PENDING').set(as(OWNER_TOKEN));
+      expect(list.status).toBe(200);
+      const row = list.body.data.items.find((item: { id: string }) => item.id === orderId);
+      expect(row.deliveryDeadline).toBe('2026-11-05');
+
+      const detail = await request(app).get(`/api/orders/${orderId}`).set(as(OWNER_TOKEN));
+      expect(detail.body.data.deliveryDeadline).toBe('2026-11-05');
+    });
+
+    it('sets, changes, and clears the deadline with one version step and a named audit field each time', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+
+      const set = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, deliveryDeadline: '2026-11-05' });
+      expect(set.status).toBe(200);
+      expect(set.body.data.deliveryDeadline).toBe('2026-11-05');
+      expect(set.body.data.version).toBe(2);
+
+      const sameValue = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 2, deliveryDeadline: '2026-11-05' });
+      expect(sameValue.status).toBe(200);
+      expect(sameValue.body.data.version).toBe(2);
+
+      const cleared = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 2, deliveryDeadline: null });
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.data.deliveryDeadline).toBeNull();
+      expect(cleared.body.data.version).toBe(3);
+
+      const audits = await auditRowsFor(orderId);
+      const uuids = audits.filter((row) => row.action === 'ORDER_UPDATED');
+      expect(uuids).toHaveLength(2);
+      for (const row of uuids) {
+        expect(JSON.parse(String(row.metadata))).toMatchObject({
+          changedFields: ['deliveryDeadline'],
+        });
+      }
+    });
+
+    it('locks a deadline change once the order moves past confirmed', async () => {
+      const created = await createOrder(baseOrder({ deliveryDeadline: '2020-01-01' }));
+      const orderId = created.body.data.id;
+
+      await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .set(as(OWNER_TOKEN))
+        .send({ status: 'CONFIRMED', version: 1 });
+      await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .set(as(OWNER_TOKEN))
+        .send({ status: 'PROCESSING', version: 2 });
+
+      const locked = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 3, deliveryDeadline: '2026-11-05' });
+
+      expect(locked.status).toBe(409);
+      expect(locked.body.error).toBe('ORDER_LOCKED');
+
+      const detail = await request(app).get(`/api/orders/${orderId}`).set(as(OWNER_TOKEN));
+      expect(detail.body.data.deliveryDeadline).toBe('2020-01-01');
+    });
+
+    it('does not let a deadline change alter totals and rejects a stale version', async () => {
+      const created = await createOrder(baseOrder({ deliveryDeadline: '2026-11-05' }));
+      const orderId = created.body.data.id;
+      const before = created.body.data;
+
+      const stale = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 99, deliveryDeadline: '2026-12-25' });
+      expect(stale.status).toBe(409);
+      expect(stale.body.error).toBe('ORDER_CHANGED');
+
+      const changed = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, deliveryDeadline: '2026-12-25' });
+      expect(changed.status).toBe(200);
+      expect(changed.body.data.total).toBe(before.total);
+      expect(changed.body.data.subtotal).toBe(before.subtotal);
+      expect(changed.body.data.dueAmount).toBe(before.dueAmount);
+      expect(changed.body.data.deliveryDeadline).toBe('2026-12-25');
+    });
+  });
+
   describe('status workflow (AC-10, AC-18)', () => {
     it('walks the allowed path, records actors and notes, and rejects invalid moves', async () => {
       const created = await createOrder(

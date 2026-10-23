@@ -26,6 +26,7 @@ function makeOrder(overrides: Partial<OrderSummaryDto> = {}): OrderSummaryDto {
     total: 9350,
     dueAmount: 9350,
     source: 'FACEBOOK',
+    deliveryDeadline: null,
     itemCount: 2,
     createdAt: created,
     updatedAt: created,

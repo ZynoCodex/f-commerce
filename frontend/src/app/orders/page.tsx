@@ -19,6 +19,7 @@ import {
   Spinner,
 } from '@/components/ui/primitives';
 import { OrderStatusBadge } from '@/components/orders/order-status';
+import { OrderDeadlineCell } from '@/components/orders/order-deadline';
 import { getBusinessCurrency } from '@/lib/catalog-client';
 import { formatDateTime, formatMoney } from '@/lib/catalog-format';
 import { useRequireAuth } from '@/lib/auth-guard';
@@ -194,6 +195,11 @@ export default function OrdersPage() {
       key: 'status' as const,
       label: 'Status',
       render: (row: OrderSummaryDto) => <OrderStatusBadge status={row.status} />,
+    },
+    {
+      key: 'deliveryDeadline' as const,
+      label: 'Delivery deadline',
+      render: (row: OrderSummaryDto) => <OrderDeadlineCell row={row} />,
     },
     {
       key: 'total' as const,
@@ -392,6 +398,12 @@ export default function OrdersPage() {
                       <p className="mt-1 font-mono text-ink">
                         {formatMoney(row.dueAmount, currency)}
                       </p>
+                    </div>
+                  </div>
+                  <div className="text-sm">
+                    <p className="text-muted">Delivery deadline</p>
+                    <div className="mt-1">
+                      <OrderDeadlineCell row={row} />
                     </div>
                   </div>
                   <p className="text-sm text-muted">

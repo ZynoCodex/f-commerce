@@ -36,6 +36,13 @@
       "when": 1792727344016,
       "tag": "0004_order_snapshot_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792754902414,
+      "tag": "0005_amusing_bug",
+      "breakpoints": true
     }
   ]
 }

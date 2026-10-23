@@ -24,6 +24,7 @@ import { isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import { getBusinessCurrency } from '@/lib/catalog-client';
 import { formatDateTime, formatMoney } from '@/lib/catalog-format';
+import { OrderDeadlineSummary } from '@/components/orders/order-deadline';
 import { OrderApiError, changeOrderStatus, getOrder } from '@/lib/order-client';
 import {
   ORDER_STATUS_LABEL,
@@ -313,6 +314,12 @@ export default function OrderDetailPage() {
                         <dt className="text-sm font-semibold text-body">Shipping address</dt>
                         <dd className="mt-1 whitespace-pre-line text-ink">
                           {order.shippingAddress ?? 'Not provided'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-semibold text-body">Delivery deadline</dt>
+                        <dd className="mt-1">
+                          <OrderDeadlineSummary order={order} />
                         </dd>
                       </div>
                       <div>
