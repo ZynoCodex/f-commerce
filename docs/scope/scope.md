@@ -158,7 +158,7 @@ Product CRUD with images, SKU, stock tracking, categories, low-stock thresholds,
 - [x] Review it (fresh model): `/check review products` — See [2026-10-21-feat-products.md](../reviews/2026-10-21-feat-products.md), approve with nits.
 - [x] Document it: `/document products` — See [2026-10-21-feat-products.md](../PRs/2026-10-21-feat-products.md).
 
-### 9. Orders (CRUD + status workflow) · in-progress
+### 9. Orders (CRUD + status workflow) · in-progress (verified)
 
 Order creation from customer/product selection, status states, order history, source tracking, formula calculations.
 **Done when:** user can create order in ~60 seconds, see status timeline, and order persists correctly.
@@ -172,7 +172,7 @@ Order creation from customer/product selection, status states, order history, so
   - [x] Edits, concurrency and workflow: `lineId` replacement, version guards, transition table, history rows and in place edit (AC-3, AC-9, AC-10, AC-13, AC-16, AC-18)
   - [x] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
         Code in `packages/contracts/src/order.ts`, `backend/src/application/services/order.service.ts`, `backend/src/presentation/controllers/order.controller.ts`, `frontend/src/app/orders/`
-- [ ] Verify it: `/check verify orders`
+- [x] Verify it: `/check verify orders` — all 18 acceptance criteria verified at runtime; backend, frontend and contract suites pass; lint, typecheck, format and build clean. See [verify.md](../specs/0007-orders/verify.md).
 - [ ] Test it: `/test orders`
 - [ ] Review it (fresh model): `/check review orders`
 - [ ] Document it: `/document orders`
