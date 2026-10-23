@@ -14,6 +14,8 @@ export interface ProductVariantImage {
 }
 
 export interface ProductVariant {
+  /** Set for persisted variants; absent while a variant matrix is being validated. */
+  id?: string;
   combination: Record<string, string>;
   sku?: string;
   price?: number;

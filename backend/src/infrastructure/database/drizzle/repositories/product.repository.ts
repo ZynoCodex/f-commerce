@@ -45,6 +45,7 @@ function skusOf(productSku: string | null | undefined, variants: { sku?: string 
 
 function toProductVariant(row: VariantRow): ProductVariant {
   return {
+    id: row.id,
     combination: row.combination,
     sku: row.sku ?? undefined,
     price: row.price ?? undefined,
