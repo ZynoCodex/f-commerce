@@ -87,6 +87,8 @@ async function seedOrder(
         customerId,
         orderNumber: fields.orderNumber,
         status: fields.status ?? OrderStatus.PENDING,
+        customerNameSnapshot: 'Snapshot customer',
+        customerPhoneSnapshot: '+8801700000000',
         subtotal: fields.total,
         deliveryFee: 0,
         discount: 0,

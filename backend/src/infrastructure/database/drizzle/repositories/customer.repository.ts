@@ -39,14 +39,13 @@ function toCustomer(row: typeof customers.$inferSelect): Customer {
 }
 
 function toOrder(row: typeof orders.$inferSelect): Order {
-  if (row.customerId === null) {
-    throw new Error('Order row is missing customerId');
-  }
   return {
     id: row.id,
     customerId: row.customerId,
     orderNumber: row.orderNumber,
     status: row.status,
+    customerNameSnapshot: row.customerNameSnapshot,
+    customerPhoneSnapshot: row.customerPhoneSnapshot,
     subtotal: row.subtotal,
     deliveryFee: row.deliveryFee,
     discount: row.discount,
@@ -59,6 +58,7 @@ function toOrder(row: typeof orders.$inferSelect): Order {
     source: row.source ?? undefined,
     notes: row.notes ?? undefined,
     idempotencyKey: row.idempotencyKey ?? undefined,
+    version: row.version,
     businessId: row.businessId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
