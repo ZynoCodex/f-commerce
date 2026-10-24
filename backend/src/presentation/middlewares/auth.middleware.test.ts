@@ -54,6 +54,24 @@ describe('Auth Middleware', () => {
       expect(req.user).toEqual({ userId: '123' });
       expect(next).toHaveBeenCalled();
     });
+
+    it('returns 401 when the token has no user id', () => {
+      req.headers!.authorization = 'Bearer valid';
+      vi.mocked(jwt.verify).mockReturnValue({ memberships: [] } as never);
+
+      requireAuth(req as Request, res as Response, next);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when the token user id is blank', () => {
+      req.headers!.authorization = 'Bearer valid';
+      vi.mocked(jwt.verify).mockReturnValue({ userId: '   ', memberships: [] } as never);
+
+      requireAuth(req as Request, res as Response, next);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 
   describe('requireBusinessRole', () => {

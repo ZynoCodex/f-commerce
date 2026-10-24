@@ -1,15 +1,1 @@
-Products and categories (spec 0006, scope row 8) are implemented, verified, reviewed, and documented on `feat/products`.
-
-Current state
-- Contracts, backend, and frontend builds are green. Typecheck, lint, and format checks pass.
-- Tests last run: 290 backend passed with 1 skipped, 87 frontend passed, 32 contracts passed.
-- Fresh review: `docs/reviews/2026-10-21-feat-products.md`, approve with 3 informational nits, 0 major and 0 minor.
-- PR text: `docs/PRs/2026-10-21-feat-products.md`.
-- Scope row 8 is marked done.
-
-Remaining before merge
-- Commit the catalog work in milestones, push `feat/products`, and open the PR against `main`.
-- Accepted risks: Cloudinary assets are retained after image removal or product hard delete per AC-5; the migration adds indexes with plain `CREATE INDEX` while the catalog is new; the variant matrix reconciliation is bounded at 50 variants.
-
-Next slice
-- Orders (scope row 9) still needs a design decision before `/architect orders`.
+Heads up: the same silent skeleton pattern still exists at frontend/src/app/products/page.tsx:662 and frontend/src/app/customers/page.tsx:301. I left both alone because they belong to other features. They are worth the same treatment in their own polish passes.

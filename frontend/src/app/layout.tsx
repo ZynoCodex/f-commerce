@@ -30,7 +30,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${dmSans.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >
-      <body>
+      {/* Grammarly and similar extensions add attributes to body before React hydrates. */}
+      <body suppressHydrationWarning>
         <ThemeBoundary>{children}</ThemeBoundary>
       </body>
     </html>

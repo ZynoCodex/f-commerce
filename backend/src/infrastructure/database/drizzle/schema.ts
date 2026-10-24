@@ -7,6 +7,7 @@ import {
   boolean,
   integer,
   jsonb,
+  date,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -207,6 +208,8 @@ export const orders = pgTable(
       .$type<OrderStatus>()
       .notNull()
       .default('PENDING' as OrderStatus),
+    customerNameSnapshot: text('customer_name_snapshot').notNull(),
+    customerPhoneSnapshot: text('customer_phone_snapshot').notNull(),
     subtotal: integer('subtotal').notNull(),
     deliveryFee: integer('delivery_fee').notNull().default(0),
     discount: integer('discount').notNull().default(0),
@@ -218,7 +221,11 @@ export const orders = pgTable(
     trackingNumber: text('tracking_number'),
     source: text('source'),
     notes: text('notes'),
+    // A promise is a day, not a moment. String mode keeps it a YYYY-MM-DD
+    // value so it never becomes a Date and never shifts by timezone.
+    deliveryDeadline: date('delivery_deadline', { mode: 'string' }),
     idempotencyKey: text('idempotency_key'),
+    version: integer('version').notNull().default(1),
     ...timestamps,
   },
   (table) => [
@@ -232,6 +239,13 @@ export const orders = pgTable(
       table.createdAt,
       table.id,
     ),
+    index('orders_business_status_created_idx').on(
+      table.businessId,
+      table.status,
+      table.createdAt,
+      table.id,
+    ),
+    index('orders_business_created_idx').on(table.businessId, table.createdAt, table.id),
   ],
 );
 
@@ -248,11 +262,14 @@ export const orderItems = pgTable(
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id),
+    variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
     productNameSnapshot: text('product_name_snapshot').notNull(),
+    variantLabelSnapshot: text('variant_label_snapshot'),
     priceSnapshot: integer('price_snapshot').notNull(),
     costSnapshot: integer('cost_snapshot').notNull().default(0),
     quantity: integer('quantity').notNull(),
     subtotal: integer('subtotal').notNull(),
+    position: integer('position').notNull().default(0),
     ...timestamps,
   },
   (table) => [
@@ -261,6 +278,41 @@ export const orderItems = pgTable(
     index('order_items_business_product_idx').on(table.businessId, table.productId),
   ],
 );
+
+export const orderStatusHistory = pgTable(
+  'order_status_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    fromStatus: text('from_status').$type<OrderStatus>(),
+    toStatus: text('to_status').$type<OrderStatus>().notNull(),
+    note: text('note'),
+    changedByUserId: uuid('changed_by_user_id').notNull(),
+    changedByName: text('changed_by_name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('order_status_history_business_order_created_idx').on(
+      table.businessId,
+      table.orderId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
+
+export const businessOrderCounters = pgTable('business_order_counters', {
+  businessId: uuid('business_id')
+    .primaryKey()
+    .references(() => businesses.id),
+  lastNumber: integer('last_number').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const auditLogs = pgTable(
   'audit_logs',

@@ -189,6 +189,8 @@ async function seedOrderItem(productId: string): Promise<void> {
       .values({
         businessId: BIZ,
         orderNumber: `ORD-${orderSequence}`,
+        customerNameSnapshot: 'Snapshot customer',
+        customerPhoneSnapshot: '+8801700000000',
         subtotal: 100,
         total: 100,
         dueAmount: 100,

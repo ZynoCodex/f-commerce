@@ -77,6 +77,7 @@ function toDto(product: Product, categoryName: string | null): ProductDto {
     images: product.images,
     options: product.options,
     variants: product.variants.map((variant, index) => ({
+      id: variant.id,
       combination: variant.combination,
       sku: variant.sku ?? null,
       price: variant.price ?? null,

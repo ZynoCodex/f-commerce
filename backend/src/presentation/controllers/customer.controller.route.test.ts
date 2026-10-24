@@ -87,6 +87,8 @@ async function seedOrder(
         customerId,
         orderNumber: fields.orderNumber,
         status: fields.status ?? OrderStatus.PENDING,
+        customerNameSnapshot: 'Snapshot customer',
+        customerPhoneSnapshot: '+8801700000000',
         subtotal: fields.total,
         deliveryFee: 0,
         discount: 0,
@@ -315,6 +317,40 @@ describe('customer routes against PostgreSQL', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({ error: 'VALIDATION_ERROR', fields: ['email'] });
+    });
+
+    it('trims padded optional fields on create and edit', async () => {
+      const created = await createViaApi({
+        name: '  Anika Rahman  ',
+        email: '  anika@example.com  ',
+        address: '  12 Lake Road  ',
+        notes: '  Called ahead  ',
+      });
+
+      expect(created.status).toBe(201);
+      expect(created.body.data).toMatchObject({
+        name: 'Anika Rahman',
+        email: 'anika@example.com',
+        address: '12 Lake Road',
+        notes: 'Called ahead',
+      });
+
+      const edited = await request(app)
+        .patch(`/api/customers/${created.body.data.id}`)
+        .set(as(OWNER_TOKEN))
+        .send({
+          version: 1,
+          email: '  new@example.com  ',
+          address: '  14 Lake Road  ',
+          notes: '  Leave at the desk  ',
+        });
+
+      expect(edited.status).toBe(200);
+      expect(edited.body.data).toMatchObject({
+        email: 'new@example.com',
+        address: '14 Lake Road',
+        notes: 'Leave at the desk',
+      });
     });
 
     it('rejects a malformed search cursor with 400', async () => {
