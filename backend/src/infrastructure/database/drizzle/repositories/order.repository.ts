@@ -286,7 +286,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
         ),
       )
       .orderBy(desc(orders.createdAt), desc(orders.id))
-      .limit(100);
+      .limit(100); // Performance safeguard: limits to 100 most recent orders when a customer has many orders in 24h
 
     const wanted = new Set(pairs.map(pairKey));
     for (const row of rows) {

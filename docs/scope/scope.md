@@ -175,7 +175,7 @@ Order creation from customer/product selection, status states, order history, so
         Code in `packages/contracts/src/order.ts`, `backend/src/application/services/order.service.ts`, `backend/src/presentation/controllers/order.controller.ts`, `frontend/src/app/orders/`, `frontend/src/components/orders/order-deadline.tsx`
 - [x] Verify it: `/check verify orders` — all 19 acceptance criteria verified at runtime; backend, frontend and contract suites pass; lint, typecheck, format and build clean. See [verify.md](../specs/0007-orders/verify.md).
 - [x] Test it: `/test orders` — 362 backend, 166 frontend and 93 contract tests pass; 6 orders E2E runs pass on desktop and mobile; typecheck, lint and format checks clean.
-- [x] Review it (fresh model): `/check review orders` — See [2026-10-24-feat-orders-review2.md](../reviews/2026-10-24-feat-orders-review2.md)
+- [x] Review it (fresh model): `/check review orders` — See [2026-10-24-feat-orders.md](../reviews/2026-10-24-feat-orders.md)
 - [ ] Document it: `/document orders`
 
 ### 10. Payments · needs a decision
