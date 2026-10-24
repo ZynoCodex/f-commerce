@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CustomerDto, OrderDto, ProductDto } from '@f-commerce/contracts';
@@ -216,6 +216,57 @@ describe('NewOrderPage', () => {
       notes: null,
       deliveryDeadline: null,
       confirmDuplicate: false,
+    });
+  });
+
+  // covers AC-15 and AC-19: a past promise warns but still saves the chosen day
+  it('warns about a past deadline without blocking the save', async () => {
+    const user = userEvent.setup();
+    const fetchMock = installedFetch((url, init) => {
+      if (url === '/api/orders' && init?.method === 'POST') {
+        return jsonResponse(201, {
+          success: true,
+          data: makeOrder({ deliveryDeadline: '2020-01-01' }),
+        });
+      }
+      if (url.startsWith('/api/customers?')) {
+        return jsonResponse(200, {
+          success: true,
+          data: { items: [customer], nextCursor: null },
+        });
+      }
+      if (url.startsWith('/api/products?')) {
+        return jsonResponse(200, {
+          success: true,
+          data: { items: [product], nextCursor: null },
+        });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'Create order' });
+    await chooseCustomerAndProduct(user);
+
+    fireEvent.change(screen.getByLabelText('Delivery deadline'), {
+      target: { value: '2020-01-01' },
+    });
+
+    expect(
+      screen.getByText('This date has already passed. You can still save the order.'),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Create order' }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/orders/order-1'));
+
+    const postCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/orders' && (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(postCall).toBeDefined();
+    expect(JSON.parse(String((postCall?.[1] as RequestInit).body))).toMatchObject({
+      deliveryDeadline: '2020-01-01',
     });
   });
 

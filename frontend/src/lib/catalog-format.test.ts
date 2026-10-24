@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDateOnly, isOverdue, localToday } from './catalog-format';
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatMoney,
+  isOverdue,
+  localToday,
+} from './catalog-format';
+
+describe('money and date time formatting', () => {
+  // covers AC-15 and AC-16: whole amounts print with the business currency, and absent money prints a dash
+  it('formats whole amounts with an optional currency', () => {
+    expect(formatMoney(9350, 'BDT')).toBe('9,350 BDT');
+    expect(formatMoney(0, '')).toBe('0');
+    expect(formatMoney(null, 'BDT')).toBe('—');
+    expect(formatMoney(undefined, 'BDT')).toBe('—');
+  });
+
+  // covers AC-16: a valid timestamp prints as a date and an unexpected value passes through
+  it('formats a timestamp and passes an invalid one through', () => {
+    expect(formatDateTime('2026-10-20T10:00:00.000Z')).toContain('2026');
+    expect(formatDateTime('not-a-date')).toBe('not-a-date');
+  });
+});
 
 describe('date only formatter', () => {
   // covers AC-19: the stored day is shown as a calendar date with no timezone shift

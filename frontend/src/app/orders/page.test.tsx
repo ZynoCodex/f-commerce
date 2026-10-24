@@ -107,6 +107,23 @@ describe('OrdersPage', () => {
     expect(String(listCall?.[0])).toContain('status=PENDING%2CCONFIRMED%2CPROCESSING%2CSHIPPED');
   });
 
+  // covers AC-14: the first list load is announced, not just drawn as skeletons
+  it('announces the first list load', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/orders?')) {
+        return new Promise<Response>(() => {});
+      }
+      return Promise.resolve(metadata(url) ?? jsonResponse(404, { error: 'NOT_FOUND' }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    const loading = screen.getByText('Loading orders…');
+    expect(loading.closest('[role="status"]')).not.toBeNull();
+  });
+
   it('sends the status filter and debounced search to the list request', async () => {
     const user = userEvent.setup();
     const fetchMock = installedFetch((url) => {
@@ -269,10 +286,62 @@ describe('OrdersPage', () => {
     renderPage();
 
     expect(await screen.findByText('No active orders')).toBeVisible();
+    expect(screen.getByText('No active orders').closest('[role="status"]')).not.toBeNull();
     expect(screen.getAllByRole('link', { name: 'New order' })[0]).toHaveAttribute(
       'href',
       '/orders/new',
     );
+  });
+
+  // covers AC-14 and AC-19: the queue shows the promise, the missing one, and the late flag
+  it('shows the delivery deadline and flags a late active order only', async () => {
+    installedFetch((url) => {
+      if (url.startsWith('/api/orders?')) {
+        return jsonResponse(200, {
+          success: true,
+          data: {
+            items: [
+              makeOrder({ deliveryDeadline: '2020-01-01' }),
+              makeOrder({ id: 'order-2', orderNumber: 'ORD-0002', deliveryDeadline: null }),
+              makeOrder({
+                id: 'order-3',
+                orderNumber: 'ORD-0003',
+                status: 'DELIVERED',
+                deliveryDeadline: '2020-01-01',
+              }),
+            ],
+            nextCursor: null,
+          },
+        });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findAllByRole('link', { name: 'ORD-0001' });
+
+    // The table and the mobile record card both render the cell, and two rows share the day.
+    expect(screen.getAllByText('Jan 1, 2020')).toHaveLength(4);
+    expect(screen.getAllByText('Overdue')).toHaveLength(2);
+    expect(screen.getAllByText('Not set')).toHaveLength(2);
+  });
+
+  // covers AC-14: an empty search result names the term instead of the queue
+  it('names the search term when no order matches', async () => {
+    const user = userEvent.setup();
+    installedFetch((url) => {
+      if (url.startsWith('/api/orders?')) {
+        return jsonResponse(200, { success: true, data: { items: [], nextCursor: null } });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByText('No active orders');
+
+    await user.type(screen.getByLabelText('Search orders'), 'Nusrat');
+
+    expect(await screen.findByText('No orders match “Nusrat”')).toBeVisible();
   });
 
   it('shows the server error and retries the list', async () => {

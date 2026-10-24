@@ -649,6 +649,192 @@ describe('order routes against PostgreSQL', () => {
       expect(await countOrders()).toBe(0);
     });
 
+    // covers AC-1 and AC-12: a buyer or catalog row outside this business is a field error
+    it('rejects an unknown buyer and foreign catalog references', async () => {
+      const before = await countOrders();
+
+      const unknownCustomer = await createOrder(
+        baseOrder({ customerId: '00000000-0000-0000-0000-0000000000aa' }),
+      );
+      expect(unknownCustomer.status).toBe(400);
+      expect(unknownCustomer.body.fields).toEqual(['customerId']);
+
+      const foreignProduct = await createOrder(
+        baseOrder({ items: [{ productId: fixtures.otherProductId, quantity: 1 }] }),
+      );
+      expect(foreignProduct.status).toBe(400);
+      expect(foreignProduct.body.fields).toEqual(['items']);
+
+      const foreignVariantRows = await getDb()
+        .insert(productVariants)
+        .values({
+          businessId: OTHER_BIZ,
+          productId: fixtures.otherProductId,
+          combination: { Size: 'L' },
+          price: 700,
+          position: 0,
+        })
+        .returning({ id: productVariants.id });
+
+      const foreignVariant = await createOrder(
+        baseOrder({
+          items: [
+            {
+              productId: fixtures.simpleProductId,
+              variantId: foreignVariantRows[0].id,
+              quantity: 1,
+            },
+          ],
+        }),
+      );
+      expect(foreignVariant.status).toBe(400);
+      expect(foreignVariant.body.fields).toEqual(['items']);
+
+      expect(await countOrders()).toBe(before);
+    });
+
+    // covers AC-4 and AC-11: the service enforces the caps and the discount boundary
+    it('enforces the subtotal and total caps and allows a discount equal to the payable amount', async () => {
+      const subtotalOverCap = await createOrder(
+        baseOrder({
+          items: [{ productId: fixtures.simpleProductId, quantity: 1000, unitPrice: 100_000_000 }],
+          confirmDuplicate: true,
+        }),
+      );
+      expect(subtotalOverCap.status).toBe(400);
+      expect(subtotalOverCap.body.fields).toEqual(['items']);
+
+      const totalOverCap = await createOrder(
+        baseOrder({
+          items: [{ productId: fixtures.simpleProductId, quantity: 20, unitPrice: 100_000_000 }],
+          deliveryFee: 1,
+          confirmDuplicate: true,
+        }),
+      );
+      expect(totalOverCap.status).toBe(400);
+      expect(totalOverCap.body.fields).toEqual(['total']);
+
+      const exactDiscount = await createOrder(
+        baseOrder({
+          items: [{ productId: fixtures.simpleProductId, quantity: 1 }],
+          deliveryFee: 500,
+          discount: 1500,
+          confirmDuplicate: true,
+        }),
+      );
+      expect(exactDiscount.status).toBe(201);
+      expect(exactDiscount.body.data).toMatchObject({
+        subtotal: 1000,
+        total: 0,
+        dueAmount: 0,
+      });
+
+      const oneTooMuch = await createOrder(
+        baseOrder({
+          items: [{ productId: fixtures.simpleProductId, quantity: 1 }],
+          deliveryFee: 500,
+          discount: 1501,
+          confirmDuplicate: true,
+        }),
+      );
+      expect(oneTooMuch.status).toBe(400);
+      expect(oneTooMuch.body.fields).toEqual(['discount']);
+    });
+
+    // covers AC-4 and AC-9: the edit path enforces the discount rule and leaves the order untouched
+    it('rejects an edit whose discount exceeds the order total', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+
+      const tooHigh = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, discount: 1001 });
+      expect(tooHigh.status).toBe(400);
+      expect(tooHigh.body.fields).toEqual(['discount']);
+
+      const after = await request(app).get(`/api/orders/${orderId}`).set(as(OWNER_TOKEN));
+      expect(after.body.data).toMatchObject({ total: 1000, version: 1, discount: 0 });
+    });
+
+    // covers AC-9, AC-10, and AC-12: every write needs a token, and staff can read
+    it('requires a token on every write and lets staff read the queue', async () => {
+      const created = await createOrder(baseOrder());
+      expect(created.status).toBe(201);
+      const orderId = created.body.data.id;
+
+      const postWithoutToken = await request(app)
+        .post('/api/orders')
+        .send(baseOrder({ confirmDuplicate: true }));
+      expect(postWithoutToken.status).toBe(401);
+
+      const patchWithoutToken = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .send({ version: 1, notes: 'no token' });
+      expect(patchWithoutToken.status).toBe(401);
+
+      const statusWithoutToken = await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .send({ status: 'CONFIRMED', version: 1 });
+      expect(statusWithoutToken.status).toBe(401);
+
+      const staffList = await request(app).get('/api/orders').set(as(STAFF_TOKEN));
+      expect(staffList.status).toBe(200);
+      expect(staffList.body.data.items.some((item: { id: string }) => item.id === orderId)).toBe(
+        true,
+      );
+
+      const staffDetail = await request(app).get(`/api/orders/${orderId}`).set(as(STAFF_TOKEN));
+      expect(staffDetail.status).toBe(200);
+    });
+
+    // covers AC-9 and AC-12: a missing, malformed, or foreign id is a 404 on edit
+    it('returns 404 for an edit on a missing, malformed, or foreign order', async () => {
+      const missing = await request(app)
+        .patch('/api/orders/00000000-0000-0000-0000-0000000000ff')
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, notes: 'missing' });
+      expect(missing.status).toBe(404);
+      expect(missing.body.error).toBe('NOT_FOUND');
+
+      const malformed = await request(app)
+        .patch('/api/orders/not-a-uuid')
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, notes: 'malformed' });
+      expect(malformed.status).toBe(404);
+
+      const foreign = await createOrder(
+        {
+          customerId: fixtures.otherCustomerId,
+          items: [{ productId: fixtures.otherProductId, quantity: 1 }],
+          source: 'DIRECT',
+        },
+        OUTSIDER_TOKEN,
+        undefined,
+        OTHER_BIZ,
+      );
+      expect(foreign.status).toBe(201);
+
+      const crossTenant = await request(app)
+        .patch(`/api/orders/${foreign.body.data.id}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, notes: 'not mine' });
+      expect(crossTenant.status).toBe(404);
+      expect(crossTenant.body.error).toBe('NOT_FOUND');
+    });
+
+    // covers AC-11: the edit payload needs a version and reports the bad field
+    it('rejects an edit without a version', async () => {
+      const created = await createOrder(baseOrder());
+
+      const missingVersion = await request(app)
+        .patch(`/api/orders/${created.body.data.id}`)
+        .set(as(OWNER_TOKEN))
+        .send({ notes: 'no version' });
+      expect(missingVersion.status).toBe(400);
+      expect(missingVersion.body.fields).toEqual(['version']);
+    });
+
     it('accepts staff writes and rejects missing or foreign authentication', async () => {
       const staffOrder = await createOrder(baseOrder(), STAFF_TOKEN);
       expect(staffOrder.status).toBe(201);
@@ -847,6 +1033,22 @@ describe('order routes against PostgreSQL', () => {
       const longKey = await createOrder(baseOrder(), OWNER_TOKEN, 'x'.repeat(101));
       expect(longKey.status).toBe(400);
       expect(longKey.body.fields).toEqual(['Idempotency-Key']);
+
+      // covers AC-6: the key is trimmed and accepted at both length edges
+      const shortKey = await createOrder(baseOrder({ confirmDuplicate: true }), OWNER_TOKEN, 'k');
+      expect(shortKey.status).toBe(201);
+
+      const exactKey = await createOrder(
+        baseOrder({ confirmDuplicate: true }),
+        OWNER_TOKEN,
+        'y'.repeat(100),
+      );
+      expect(exactKey.status).toBe(201);
+      expect(exactKey.body.data.id).not.toBe(shortKey.body.data.id);
+
+      const blankKey = await createOrder(baseOrder(), OWNER_TOKEN, '   ');
+      expect(blankKey.status).toBe(400);
+      expect(blankKey.body.fields).toEqual(['Idempotency-Key']);
 
       const raceBody = baseOrder({
         customerId: fixtures.thirdCustomerId,
@@ -1121,6 +1323,17 @@ describe('order routes against PostgreSQL', () => {
       ];
       expect(new Set(ids).size).toBe(21);
     });
+
+    // covers AC-7: an unknown status filter is a field error, not an empty page
+    it('rejects an unknown status filter', async () => {
+      const unknown = await request(app)
+        .get('/api/orders?status=PENDING,ARCHIVED')
+        .set(as(OWNER_TOKEN));
+
+      expect(unknown.status).toBe(400);
+      expect(unknown.body.error).toBe('VALIDATION_ERROR');
+      expect(unknown.body.fields).toEqual(['status']);
+    });
   });
 
   describe('edit (AC-3, AC-9, AC-13, AC-17)', () => {
@@ -1259,6 +1472,84 @@ describe('order routes against PostgreSQL', () => {
       expect(stale.body.error).toBe('ORDER_CHANGED');
     });
 
+    // covers AC-9: changing only the line order still bumps the version and the audit
+    it('bumps the version when only the line order changes', async () => {
+      const created = await createOrder(
+        baseOrder({
+          items: [
+            { productId: fixtures.simpleProductId, quantity: 1 },
+            { productId: fixtures.variantProductId, variantId: fixtures.variantMId, quantity: 2 },
+          ],
+        }),
+      );
+      const order = created.body.data;
+      const [firstLine, secondLine] = order.items;
+
+      const reordered = await request(app)
+        .patch(`/api/orders/${order.id}`)
+        .set(as(OWNER_TOKEN))
+        .send({
+          version: 1,
+          items: [
+            {
+              lineId: secondLine.id,
+              productId: secondLine.productId,
+              variantId: secondLine.variantId,
+              quantity: secondLine.quantity,
+              unitPrice: secondLine.price,
+            },
+            {
+              lineId: firstLine.id,
+              productId: firstLine.productId,
+              variantId: firstLine.variantId,
+              quantity: firstLine.quantity,
+              unitPrice: firstLine.price,
+            },
+          ],
+        });
+
+      expect(reordered.status).toBe(200);
+      expect(reordered.body.data.version).toBe(2);
+      expect(reordered.body.data.items.map((item: { id: string }) => item.id)).toEqual([
+        secondLine.id,
+        firstLine.id,
+      ]);
+      expect(reordered.body.data.items.map((item: { position: number }) => item.position)).toEqual([
+        0, 1,
+      ]);
+
+      const updateAudit = (await auditRowsFor(order.id)).find(
+        (row) => row.action === 'ORDER_UPDATED',
+      );
+      expect(JSON.parse(String(updateAudit?.metadata)).changedFields).toEqual(['items']);
+    });
+
+    // covers AC-9 and AC-17: a source change keeps the totals and names its own audit field
+    it('records a source change as its own audit field', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+      const backdated = new Date('2020-01-01T00:00:00.000Z');
+      await getDb().update(orders).set({ updatedAt: backdated }).where(eq(orders.id, orderId));
+
+      const changed = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, source: 'WHATSAPP' });
+
+      expect(changed.status).toBe(200);
+      expect(changed.body.data).toMatchObject({
+        source: 'WHATSAPP',
+        version: 2,
+        total: created.body.data.total,
+      });
+      expect(new Date(changed.body.data.updatedAt).getTime()).toBeGreaterThan(backdated.getTime());
+
+      const updateAudit = (await auditRowsFor(orderId)).find(
+        (row) => row.action === 'ORDER_UPDATED',
+      );
+      expect(JSON.parse(String(updateAudit?.metadata)).changedFields).toEqual(['source']);
+    });
+
     it('validates line identity and accepts archived references only for existing lines', async () => {
       const created = await createOrder(
         baseOrder({
@@ -1325,6 +1616,28 @@ describe('order routes against PostgreSQL', () => {
         });
       expect(mismatched.status).toBe(400);
       expect(mismatched.body.fields).toEqual(['items']);
+
+      const secondOrder = await createOrder(
+        baseOrder({
+          customerId: fixtures.secondCustomerId,
+          items: [{ productId: fixtures.simpleProductId, quantity: 1 }],
+        }),
+      );
+      const foreignLine = await request(app)
+        .patch(`/api/orders/${order.id}`)
+        .set(as(OWNER_TOKEN))
+        .send({
+          version: 1,
+          items: [
+            {
+              lineId: secondOrder.body.data.items[0].id,
+              productId: fixtures.simpleProductId,
+              quantity: 1,
+            },
+          ],
+        });
+      expect(foreignLine.status).toBe(400);
+      expect(foreignLine.body.fields).toEqual(['items']);
 
       await getDb()
         .update(products)
@@ -1474,6 +1787,30 @@ describe('order routes against PostgreSQL', () => {
         version: 1,
       });
     });
+
+    // covers AC-13: archiving the current buyer does not block an unrelated edit
+    it('keeps an unchanged archived buyer on an edit', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+
+      await getDb()
+        .update(customers)
+        .set({ archivedAt: new Date() })
+        .where(eq(customers.id, fixtures.customerId));
+
+      const edited = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, customerId: fixtures.customerId, notes: 'Still the same buyer' });
+
+      expect(edited.status).toBe(200);
+      expect(edited.body.data).toMatchObject({
+        customerId: fixtures.customerId,
+        customerName: 'Nusrat Jahan',
+        notes: 'Still the same buyer',
+        version: 2,
+      });
+    });
   });
 
   describe('delivery deadline (AC-1, AC-7, AC-8, AC-9, AC-11, AC-17, AC-19)', () => {
@@ -1485,6 +1822,11 @@ describe('order routes against PostgreSQL', () => {
         baseOrder({ customerId: fixtures.secondCustomerId, deliveryDeadline: '   ' }),
       );
       expect(blank.body.data.deliveryDeadline).toBeNull();
+
+      const explicitNull = await createOrder(
+        baseOrder({ customerId: fixtures.thirdCustomerId, deliveryDeadline: null }),
+      );
+      expect(explicitNull.body.data.deliveryDeadline).toBeNull();
 
       const dated = await createOrder(
         baseOrder({ deliveryDeadline: '2026-11-05', confirmDuplicate: true }),
@@ -1608,6 +1950,61 @@ describe('order routes against PostgreSQL', () => {
       expect(changed.body.data.dueAmount).toBe(before.dueAmount);
       expect(changed.body.data.deliveryDeadline).toBe('2026-12-25');
     });
+
+    // covers AC-9 and AC-19: a blank edit clears the promise, and a repeat clear is a no-op
+    it('clears a deadline with a blank value and ignores a repeat clear', async () => {
+      const created = await createOrder(baseOrder({ deliveryDeadline: '2026-11-05' }));
+      const orderId = created.body.data.id;
+
+      const blankClear = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 1, deliveryDeadline: '   ' });
+      expect(blankClear.status).toBe(200);
+      expect(blankClear.body.data.deliveryDeadline).toBeNull();
+      expect(blankClear.body.data.version).toBe(2);
+
+      const repeat = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 2, deliveryDeadline: null });
+      expect(repeat.status).toBe(200);
+      expect(repeat.body.data.deliveryDeadline).toBeNull();
+      expect(repeat.body.data.version).toBe(2);
+      expect(
+        (await auditRowsFor(orderId)).filter((row) => row.action === 'ORDER_UPDATED'),
+      ).toHaveLength(1);
+
+      const invalid = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 2, deliveryDeadline: '2026-02-30' });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.fields).toEqual(['deliveryDeadline']);
+    });
+
+    // covers AC-9 and AC-19: a confirmed order can still change its promise
+    it('lets a confirmed order change its deadline', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+
+      const confirmed = await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .set(as(OWNER_TOKEN))
+        .send({ status: 'CONFIRMED', version: 1 });
+      expect(confirmed.status).toBe(200);
+
+      const dated = await request(app)
+        .patch(`/api/orders/${orderId}`)
+        .set(as(OWNER_TOKEN))
+        .send({ version: 2, deliveryDeadline: '2026-12-01' });
+      expect(dated.status).toBe(200);
+      expect(dated.body.data).toMatchObject({
+        status: 'CONFIRMED',
+        deliveryDeadline: '2026-12-01',
+        version: 3,
+      });
+    });
   });
 
   describe('status workflow (AC-10, AC-18)', () => {
@@ -1716,6 +2113,35 @@ describe('order routes against PostgreSQL', () => {
         .send({ status: 'CONFIRMED', version: 1 });
       expect(foreignMove.status).toBe(404);
       expect(foreignMove.body.error).toBe('NOT_FOUND');
+    });
+
+    // covers AC-10 and AC-17: moving to the current status fails, and status writes history but no audit row
+    it('rejects a move to the current status and writes only history', async () => {
+      const created = await createOrder(baseOrder());
+      const orderId = created.body.data.id;
+      const backdated = new Date('2020-01-01T00:00:00.000Z');
+      await getDb().update(orders).set({ updatedAt: backdated }).where(eq(orders.id, orderId));
+
+      const same = await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .set(as(OWNER_TOKEN))
+        .send({ status: 'PENDING', version: 1 });
+      expect(same.status).toBe(409);
+      expect(same.body.error).toBe('INVALID_STATUS_TRANSITION');
+
+      const moved = await request(app)
+        .post(`/api/orders/${orderId}/status`)
+        .set(as(OWNER_TOKEN))
+        .send({ status: 'CONFIRMED', version: 1 });
+      expect(moved.status).toBe(200);
+      expect(moved.body.data.version).toBe(2);
+      expect(new Date(moved.body.data.updatedAt).getTime()).toBeGreaterThan(backdated.getTime());
+
+      expect((await historyFor(orderId)).map((row) => row.toStatus)).toEqual([
+        'PENDING',
+        'CONFIRMED',
+      ]);
+      expect((await auditRowsFor(orderId)).map((row) => row.action)).toEqual(['ORDER_CREATED']);
     });
   });
 

@@ -151,6 +151,8 @@ describe('OrderDetailPage', () => {
     );
     expect(screen.getAllByText('Cotton shirt').length).toBeGreaterThan(0);
     expect(screen.getAllByText('7,550 BDT').length).toBeGreaterThan(0);
+    expect(screen.getByText('12 Lake Road')).toBeVisible();
+    expect(screen.getByText('Call first')).toBeVisible();
     expect(screen.getByText('Created as Pending')).toBeVisible();
     expect(screen.getByText('by Maya Owner')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Edit order' })).toBeVisible();
@@ -430,5 +432,99 @@ describe('OrderDetailPage', () => {
       ).toBeVisible();
     });
     expect(await screen.findByRole('button', { name: 'Start processing' })).toBeVisible();
+  });
+
+  // covers AC-16 and AC-19: the header shows the promise and flags a late active order
+  it('shows the delivery deadline with an overdue badge', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, {
+          success: true,
+          data: makeOrder({ deliveryDeadline: '2020-01-01' }),
+        });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'ORD-0001' })).toBeVisible();
+    expect(screen.getByText('Jan 1, 2020')).toBeVisible();
+    expect(screen.getByText('Overdue')).toBeVisible();
+  });
+
+  // covers AC-16: an order with no promise reads as not set
+  it('reads Not set when the order has no delivery deadline', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, {
+          success: true,
+          data: makeOrder({ deliveryDeadline: null }),
+        });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'ORD-0001' })).toBeVisible();
+    expect(screen.getByText('Not set')).toBeVisible();
+    expect(screen.queryByText('Overdue')).toBeNull();
+  });
+
+  // covers AC-16: the edit conflict reloads the newest details instead of the old form
+  it('reloads the newest details when an edit conflicts', async () => {
+    const user = userEvent.setup();
+    let order = makeOrder();
+    const reloaded = makeOrder({ notes: 'Leave at the desk', version: 2, updatedAt: updated });
+    installedFetch((url, init) => {
+      if (url === '/api/orders/order-1' && init?.method === 'PATCH') {
+        order = reloaded;
+        return jsonResponse(409, {
+          error: 'ORDER_CHANGED',
+          message: 'This order changed since you loaded it.',
+        });
+      }
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: order });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'ORD-0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Edit order' }));
+    expect(await screen.findByRole('heading', { name: 'Edit ORD-0001' })).toBeVisible();
+
+    const notes = screen.getByLabelText('Notes');
+    await user.clear(notes);
+    await user.type(notes, 'Leave at the desk');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('This order changed elsewhere. The newest details are shown.'),
+    ).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Edit order' })).toBeVisible();
+    expect(screen.getByText('Leave at the desk')).toBeVisible();
+  });
+
+  // covers AC-16: a closed order has no further moves and no edit action
+  it('explains that a closed order cannot move further', async () => {
+    installedFetch((url) => {
+      if (url === '/api/orders/order-1') {
+        return jsonResponse(200, { success: true, data: makeOrder({ status: 'CANCELLED' }) });
+      }
+      return metadata(url);
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'ORD-0001' })).toBeVisible();
+    expect(
+      screen.getByText('This order is closed. No further status changes are possible.'),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit order' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm order' })).not.toBeInTheDocument();
   });
 });

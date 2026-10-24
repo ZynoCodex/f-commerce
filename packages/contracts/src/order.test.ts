@@ -210,6 +210,37 @@ describe('order edit contract', () => {
     ).toBe(false);
   });
 
+  // covers AC-4 and AC-11: edit money and identifiers obey the same rules as create
+  it.each<[string, Record<string, unknown>]>([
+    ['a negative delivery fee', { deliveryFee: -1 }],
+    ['a fractional delivery fee', { deliveryFee: 10.5 }],
+    ['a delivery fee above the cap', { deliveryFee: 100_000_001 }],
+    ['a negative discount', { discount: -1 }],
+    ['a fractional discount', { discount: 10.5 }],
+    ['a discount above the cap', { discount: 100_000_001 }],
+    [
+      'a unit price above the cap',
+      { items: [{ productId: PRODUCT_ID, quantity: 1, unitPrice: 100_000_001 }] },
+    ],
+    ['an empty line list', { items: [] }],
+    ['an unknown source', { source: 'CARRIER_PIGEON' }],
+    ['a customer id that is not a UUID', { customerId: 'customer-1' }],
+  ])('rejects %s on edit', (_label, overrides) => {
+    expect(OrderUpdateSchema.safeParse({ version: 2, ...overrides }).success).toBe(false);
+  });
+
+  // covers AC-4 and AC-11: the edit money cap is inclusive
+  it('accepts a delivery fee and discount at the cap on edit', () => {
+    const parsed = OrderUpdateSchema.parse({
+      version: 2,
+      deliveryFee: 100_000_000,
+      discount: 100_000_000,
+    });
+
+    expect(parsed.deliveryFee).toBe(100_000_000);
+    expect(parsed.discount).toBe(100_000_000);
+  });
+
   // covers AC-9: an edit carries a version and may identify an existing line
   it('requires a positive version and accepts a line id', () => {
     const parsed = OrderUpdateSchema.parse({
@@ -233,6 +264,21 @@ describe('order edit contract', () => {
     }));
 
     expect(OrderUpdateSchema.safeParse({ version: 2, items }).success).toBe(true);
+  });
+
+  // covers AC-9 and AC-11: the edit payload has the same raw row cap as create
+  it('rejects an edit line list above the raw payload cap', () => {
+    const items = Array.from({ length: 201 }, () => ({
+      productId: PRODUCT_ID,
+      quantity: 1,
+    }));
+
+    const parsed = OrderUpdateSchema.safeParse({ version: 2, items });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues.map((issue) => issue.path.join('.'))).toContain('items');
+    }
   });
 
   // covers AC-9: the edit payload has no status field

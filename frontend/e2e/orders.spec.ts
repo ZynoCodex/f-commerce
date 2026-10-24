@@ -232,4 +232,52 @@ test.describe('orders', () => {
     );
     await expect(page.getByRole('heading', { level: 1, name: 'ORD-0002' })).toBeVisible();
   });
+
+  test('warns about a past deadline, flags the order as overdue, then clears it', async ({
+    page,
+    request: apiRequest,
+  }) => {
+    const { accessToken, businessId } = await signUpOwner(apiRequest);
+    const seeded = await seedCatalogAndCustomer(apiRequest, accessToken, businessId);
+    await setAuthState(page, accessToken, businessId);
+
+    await page.goto('/orders/new');
+    await expect(page.getByRole('heading', { level: 1, name: 'Create order' })).toBeVisible();
+    await pickCustomerAndProduct(page, seeded);
+
+    // A past promise warns but never blocks the save (AC-15, AC-19).
+    await page.getByLabel('Delivery deadline').fill('2020-01-01');
+    await expect(
+      page.getByText('This date has already passed. You can still save the order.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Create order', exact: true }).click();
+    await page.waitForURL(
+      /\/orders\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+
+    // The detail header keeps the day and derives the badge (AC-16, AC-19).
+    await expect(page.getByRole('heading', { level: 1, name: 'ORD-0001' })).toBeVisible();
+    await expect(page.getByText('Jan 1, 2020')).toBeVisible();
+    await expect(page.getByText('Overdue', { exact: true })).toBeVisible();
+
+    // The queue shows the same promise and flag (AC-14, AC-19).
+    await page.getByRole('link', { name: /back to orders/i }).click();
+    await expect(page.getByRole('link', { name: 'ORD-0001' })).toBeVisible();
+    await expect(page.getByText('Jan 1, 2020').filter({ visible: true }).first()).toBeVisible();
+    await expect(
+      page.getByText('Overdue', { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible();
+
+    // Clearing the promise removes the flag and reads as not set (AC-16, AC-19).
+    await page.getByRole('link', { name: 'ORD-0001' }).first().click();
+    await page.getByRole('button', { name: 'Edit order' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit ORD-0001' })).toBeVisible();
+    await page.getByLabel('Delivery deadline').fill('');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(page.getByText('Order updated.')).toBeVisible();
+    await expect(page.getByText('Not set')).toBeVisible();
+    await expect(page.getByText('Overdue', { exact: true })).toHaveCount(0);
+  });
 });
