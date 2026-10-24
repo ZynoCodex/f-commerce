@@ -12,17 +12,17 @@ Spec 0007 is implemented end to end: contracts, three migrations with backfills,
 
 ### 🟠 Item array limit is enforced before the merge step, contradicting AC-1/AC-11 — `packages/contracts/src/order.ts:96` (also `:108`)
 
-**Problem**: `OrderCreateSchema.items` and `OrderUpdateSchema.items` are `.min(1).max(50)` on the raw array, so a payload with 51 rows is rejected with 400 before `mergeLines` in the service ever runs. The spec is explicit the other way round: AC-1 "1 to 50 lines after merging", AC-11 "Lines are 1 to 50 distinct product and variant pairs, and same pair lines are merged before the limit is checked". The service already implements the merged check (`backend/src/application/services/order.service.ts:192-194`, ValidationError `['items']`), and `mergeLines` would correctly collapse duplicates — but the contract never lets it. Coverage is also misleading: `order.controller.route.test.ts:584-593` ("too many lines") sends 51 lines all sharing one product but with *distinct* `unitPrice` values, so a 400 would also occur under a merge-first rule (price conflict); the test passes for the wrong reason and neither the schema max nor the merged-limit path is distinguished.
+**Problem**: `OrderCreateSchema.items` and `OrderUpdateSchema.items` are `.min(1).max(50)` on the raw array, so a payload with 51 rows is rejected with 400 before `mergeLines` in the service ever runs. The spec is explicit the other way round: AC-1 "1 to 50 lines after merging", AC-11 "Lines are 1 to 50 distinct product and variant pairs, and same pair lines are merged before the limit is checked". The service already implements the merged check (`backend/src/application/services/order.service.ts:192-194`, ValidationError `['items']`), and `mergeLines` would correctly collapse duplicates — but the contract never lets it. Coverage is also misleading: `order.controller.route.test.ts:584-593` ("too many lines") sends 51 lines all sharing one product but with _distinct_ `unitPrice` values, so a 400 would also occur under a merge-first rule (price conflict); the test passes for the wrong reason and neither the schema max nor the merged-limit path is distinguished.
 
 **Why it matters**: An API client (or a future bulk import) sending predictable duplicate rows — e.g. 60 rows for 40 distinct pairs — gets a hard 400 where the contract says it must merge down and succeed. The error also names `items` for a payload the spec declares valid, so callers have no way to recover. This is a persistent behavioral mismatch with the governing spec, not a transient bug.
 
-**Suggested fix**: Raise (or drop) the raw Zod cap to a generous anti-DoS bound (e.g. 200) while keeping `.min(1)`, and let the existing `mergeLines` 50-line check be the single source of truth for the AC-11 limit. Fix the route test so it sends 51 *mergeable* rows (same pair, same unit price) that collapse to fewer than 50 distinct pairs and asserts 201, plus a case that merges past 50 distinct pairs and asserts 400.
+**Suggested fix**: Raise (or drop) the raw Zod cap to a generous anti-DoS bound (e.g. 200) while keeping `.min(1)`, and let the existing `mergeLines` 50-line check be the single source of truth for the AC-11 limit. Fix the route test so it sends 51 _mergeable_ rows (same pair, same unit price) that collapse to fewer than 50 distinct pairs and asserts 201, plus a case that merges past 50 distinct pairs and asserts 400.
 
 ## Minor
 
 ### 🟡 "Load more" can append rows from a stale filter/search into the new view — `frontend/src/app/orders/page.tsx:112-130`
 
-**Problem**: Unlike the main fetch effect (which guards with a `cancelled` flag, `page.tsx:68-95`), `loadMore` has no staleness guard. If the user clicks Load more and then changes the status chip or types (debounced) before the request lands, `changeFilter`/the search change clear `rows`, then the in-flight promise appends the *previous* filter's rows and sets `nextCursor` from the *previous* page's cursor. The list then mixes rows of two different status sets and paging continues on a cursor bound to the abandoned filter (the server rejects a rebound cursor with 400, surfacing a confusing error on the next Load more).
+**Problem**: Unlike the main fetch effect (which guards with a `cancelled` flag, `page.tsx:68-95`), `loadMore` has no staleness guard. If the user clicks Load more and then changes the status chip or types (debounced) before the request lands, `changeFilter`/the search change clear `rows`, then the in-flight promise appends the _previous_ filter's rows and sets `nextCursor` from the _previous_ page's cursor. The list then mixes rows of two different status sets and paging continues on a cursor bound to the abandoned filter (the server rejects a rebound cursor with 400, surfacing a confusing error on the next Load more).
 
 **Why it matters**: A seller filtering Active who clicks Load more on a slow link can see Delivered/Cancelled rows inside the Active queue — the exact confusion the status chips exist to prevent.
 
@@ -38,7 +38,7 @@ Spec 0007 is implemented end to end: contracts, three migrations with backfills,
 
 ### 🟡 Per-line UPDATE loop without an order scoping filter — `backend/src/infrastructure/database/drizzle/repositories/order.repository.ts:512-529`
 
-**Problem**: Existing lines are rewritten one statement at a time inside the edit transaction (up to 50 round trips per edit), and each UPDATE matches on `(orderItems.id, orderItems.businessId)` but *not* `orderItems.orderId`. The service currently guarantees ids belong to the order, so this is not exploitable today, but it is the one order-item query in the new repository that skips the owning-order filter — the same defense-in-depth the delete above it (`:501-510`) keeps.
+**Problem**: Existing lines are rewritten one statement at a time inside the edit transaction (up to 50 round trips per edit), and each UPDATE matches on `(orderItems.id, orderItems.businessId)` but _not_ `orderItems.orderId`. The service currently guarantees ids belong to the order, so this is not exploitable today, but it is the one order-item query in the new repository that skips the owning-order filter — the same defense-in-depth the delete above it (`:501-510`) keeps.
 
 **Why it matters**: Any future refactor that relaxes the service-side `lineId` ownership check turns this into cross-order corruption within a tenant, and the loop makes large edits measurably slower.
 
@@ -46,7 +46,7 @@ Spec 0007 is implemented end to end: contracts, three migrations with backfills,
 
 ## Nits
 
-- ⚪ `backend/src/infrastructure/database/drizzle/repositories/order.repository.ts:298`, the duplicate summary sets `itemCount` to the distinct *pair* count, not the line count; fine while unused, but it will report the wrong number if ever displayed.
+- ⚪ `backend/src/infrastructure/database/drizzle/repositories/order.repository.ts:298`, the duplicate summary sets `itemCount` to the distinct _pair_ count, not the line count; fine while unused, but it will report the wrong number if ever displayed.
 - ⚪ `frontend/src/app/orders/page.tsx:315-321`, the initial loading skeleton rows are not announced (`role="status"`/text), only the Load more and error states are; self-acknowledged in `docs/specs/0007-orders/verify.md:93`.
 - ⚪ `backend/src/application/services/order.service.ts:632-639`, `parseLimit` accepts numeric forms like `0x20` or `1e1` (`Number` semantics); harmless today, but stricter parsing would keep the query contract clean.
 - ⚪ `backend/src/presentation/controllers/order.controller.ts:98`, `req.user as { userId?: string }` cast; a narrow Zod parse of the decoded auth payload would keep the boundary checked.

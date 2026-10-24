@@ -173,9 +173,9 @@ Order creation from customer/product selection, status states, order history, so
   - [x] Duplicate guard and hardening: idempotency replay, 24 hour warning, tenant and archived cases, rollback, accessibility and empty states (AC-5, AC-6, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17)
   - [x] Promised delivery date: nullable `delivery_deadline` date column in string mode, `deliveryDeadline` on the create, update, list, and detail contracts, the form field with a clear control, the date only formatter and `localToday()` helper, the derived `Overdue` badge, and the edit lock and audit (AC-1, AC-7, AC-8, AC-9, AC-11, AC-14, AC-15, AC-16, AC-17, AC-19)
         Code in `packages/contracts/src/order.ts`, `backend/src/application/services/order.service.ts`, `backend/src/presentation/controllers/order.controller.ts`, `frontend/src/app/orders/`, `frontend/src/components/orders/order-deadline.tsx`
-- [x] Verify it: `/check verify orders` — all 18 acceptance criteria verified at runtime; backend, frontend and contract suites pass; lint, typecheck, format and build clean. See [verify.md](../specs/0007-orders/verify.md).
-- [x] Test it: `/test orders` — 339 backend, 136 frontend and 76 contract tests pass; 4 orders E2E runs pass on desktop and mobile; typecheck, lint and format checks clean.
-- [x] Review it (fresh model): `/check review orders` — See [2026-10-23-feat-orders.md](../reviews/2026-10-23-feat-orders.md)
+- [x] Verify it: `/check verify orders` — all 19 acceptance criteria verified at runtime; backend, frontend and contract suites pass; lint, typecheck, format and build clean. See [verify.md](../specs/0007-orders/verify.md).
+- [x] Test it: `/test orders` — 362 backend, 166 frontend and 93 contract tests pass; 6 orders E2E runs pass on desktop and mobile; typecheck, lint and format checks clean.
+- [x] Review it (fresh model): `/check review orders` — See [2026-10-24-feat-orders-review2.md](../reviews/2026-10-24-feat-orders-review2.md)
 - [ ] Document it: `/document orders`
 
 ### 10. Payments · needs a decision

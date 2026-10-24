@@ -52,7 +52,7 @@ The previous "too many lines" test's misleading shape was also corrected: it now
 ## Nits
 
 - ⚪ `backend/src/application/services/order.service.ts:632-639`, `parseLimit` accepts numeric forms like `0x20` or `1e1` (`Number` semantics); harmless, but stricter parsing keeps the query contract exact.
-- ⚪ `backend/src/infrastructure/database/drizzle/repositories/order.repository.ts:298`, the duplicate summary sets `itemCount` to the distinct *pair* count rather than the line count; unused today, wrong if ever displayed.
+- ⚪ `backend/src/infrastructure/database/drizzle/repositories/order.repository.ts:298`, the duplicate summary sets `itemCount` to the distinct _pair_ count rather than the line count; unused today, wrong if ever displayed.
 - ⚪ `frontend/src/app/orders/page.tsx:315-321`, initial loading skeletons are not announced (`role="status"`), unlike the Load more and error states; self-acknowledged in `docs/specs/0007-orders/verify.md:93`.
 - ⚪ `frontend/src/components/orders/customer-picker.tsx:41-45` and `frontend/src/components/orders/product-picker.tsx:31-34`, clearing the search box leaves the previous result list visible (the effect early-returns without resetting results).
 
