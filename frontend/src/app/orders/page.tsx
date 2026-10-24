@@ -332,7 +332,8 @@ export default function OrdersPage() {
         </section>
 
         {isLoading && rows.length === 0 && (
-          <div className="grid gap-3">
+          <div className="grid gap-3" role="status">
+            <span className="sr-only">Loading orders…</span>
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
@@ -348,26 +349,28 @@ export default function OrdersPage() {
         {error !== null && <ErrorState onRetry={retry}>{error}</ErrorState>}
 
         {!isLoading && error === null && rows.length === 0 && (
-          <EmptyState>
-            <div>
-              <ShoppingBag aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
-              <p className="font-semibold text-ink">{emptyTitle}</p>
-              <p className="mt-1 text-sm text-body">
-                {debouncedQuery.trim() !== ''
-                  ? 'Try a shorter search, or clear the filters to see the full queue.'
-                  : 'Create an order to start the queue.'}
-              </p>
-              {debouncedQuery.trim() === '' && (
-                <Link
-                  className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-sky px-4 text-sm font-semibold text-on-sky hover:bg-sky-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky"
-                  href="/orders/new"
-                >
-                  <Plus aria-hidden="true" size={18} />
-                  New order
-                </Link>
-              )}
-            </div>
-          </EmptyState>
+          <div role="status">
+            <EmptyState>
+              <div>
+                <ShoppingBag aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
+                <p className="font-semibold text-ink">{emptyTitle}</p>
+                <p className="mt-1 text-sm text-body">
+                  {debouncedQuery.trim() !== ''
+                    ? 'Try a shorter search, or clear the filters to see the full queue.'
+                    : 'Create an order to start the queue.'}
+                </p>
+                {debouncedQuery.trim() === '' && (
+                  <Link
+                    className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-sky px-4 text-sm font-semibold text-on-sky hover:bg-sky-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky"
+                    href="/orders/new"
+                  >
+                    <Plus aria-hidden="true" size={18} />
+                    New order
+                  </Link>
+                )}
+              </div>
+            </EmptyState>
+          </div>
         )}
 
         {rows.length > 0 && (
