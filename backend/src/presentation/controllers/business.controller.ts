@@ -116,6 +116,7 @@ businessRouter.get(
         data: {
           name: business.name,
           currency: business.currency,
+          timezone: business.timezone,
           logoUrl: business.logoUrl ?? null,
           address: business.address ?? null,
           onboardingComplete: business.onboardingComplete,
@@ -151,6 +152,7 @@ businessRouter.get(
         data: {
           name: business.name,
           currency: business.currency,
+          timezone: business.timezone,
           logoUrl: business.logoUrl ?? null,
           address: business.address ?? null,
           onboardingComplete: business.onboardingComplete,
@@ -190,6 +192,7 @@ businessRouter.put('/me', requireBusinessRole(['OWNER']), async (req: Request, r
       data: {
         name: business.name,
         currency: business.currency,
+        timezone: business.timezone,
         logoUrl: business.logoUrl ?? null,
         address: business.address ?? null,
         onboardingComplete: business.onboardingComplete,
@@ -273,10 +276,11 @@ businessRouter.put(
         return;
       }
 
-      const { name, currency, address, logoUrl } = parsed.data;
+      const { name, currency, timezone, address, logoUrl } = parsed.data;
       const business = await businessService.completeOnboarding(businessId, {
         name,
         currency,
+        timezone,
         address,
         logoUrl,
       });
@@ -291,6 +295,7 @@ businessRouter.put(
         data: {
           name: business.name,
           currency: business.currency,
+          timezone: business.timezone,
           logoUrl: business.logoUrl ?? null,
           address: business.address ?? null,
           onboardingComplete: business.onboardingComplete,

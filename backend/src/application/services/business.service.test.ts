@@ -31,6 +31,7 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
     id: 'biz1',
     name: 'Test Co',
     currency: 'BDT',
+    timezone: 'Asia/Dhaka',
     logoUrl: undefined,
     address: undefined,
     onboardingComplete: false,
@@ -133,6 +134,7 @@ describe('BusinessService', () => {
       const completeData = {
         name: 'My Business',
         currency: 'BDT' as Currency,
+        timezone: 'Asia/Dhaka',
         address: VALID_ADDRESS,
         logoUrl: 'https://res.cloudinary.com/demo/image.png',
       };
@@ -148,6 +150,7 @@ describe('BusinessService', () => {
       expect(mockBusinessRepository.updateProfile).toHaveBeenCalledWith('biz1', {
         name: 'My Business',
         currency: 'BDT',
+        timezone: 'Asia/Dhaka',
         address: VALID_ADDRESS,
         logoUrl: 'https://res.cloudinary.com/demo/image.png',
         onboardingComplete: true,
@@ -161,6 +164,7 @@ describe('BusinessService', () => {
         businessService.completeOnboarding('biz1', {
           name: '',
           currency: 'BDT' as Currency,
+          timezone: 'Asia/Dhaka',
           address: VALID_ADDRESS,
         }),
       ).rejects.toThrow(BadRequestError);
@@ -174,6 +178,20 @@ describe('BusinessService', () => {
         businessService.completeOnboarding('biz1', {
           name: 'Biz',
           currency: '' as Currency,
+          timezone: 'Asia/Dhaka',
+          address: VALID_ADDRESS,
+        }),
+      ).rejects.toThrow(BadRequestError);
+
+      expect(mockBusinessRepository.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError when timezone is missing', async () => {
+      await expect(
+        businessService.completeOnboarding('biz1', {
+          name: 'Biz',
+          currency: 'BDT' as Currency,
+          timezone: '',
           address: VALID_ADDRESS,
         }),
       ).rejects.toThrow(BadRequestError);
@@ -186,6 +204,7 @@ describe('BusinessService', () => {
         businessService.completeOnboarding('biz1', {
           name: 'Biz',
           currency: 'BDT' as Currency,
+          timezone: 'Asia/Dhaka',
           address: undefined as unknown as AddressData,
         }),
       ).rejects.toThrow(BadRequestError);
@@ -197,6 +216,7 @@ describe('BusinessService', () => {
       const completeData = {
         name: 'My Business',
         currency: 'USD' as Currency,
+        timezone: 'Europe/London',
         address: VALID_ADDRESS,
       };
       const mockUpdated = makeBusiness({
@@ -211,6 +231,7 @@ describe('BusinessService', () => {
       expect(mockBusinessRepository.updateProfile).toHaveBeenCalledWith('biz1', {
         name: 'My Business',
         currency: 'USD',
+        timezone: 'Europe/London',
         address: VALID_ADDRESS,
         logoUrl: undefined,
         onboardingComplete: true,

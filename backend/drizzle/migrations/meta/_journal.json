@@ -43,6 +43,13 @@
       "when": 1792754902414,
       "tag": "0005_amusing_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792917275324,
+      "tag": "0006_absurd_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

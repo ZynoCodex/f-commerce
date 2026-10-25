@@ -10,6 +10,7 @@ function toBusiness(row: typeof businesses.$inferSelect): Business {
     id: row.id,
     name: row.name,
     currency: row.currency as Business['currency'],
+    timezone: row.timezone,
     logoUrl: row.logoUrl ?? undefined,
     address: row.address ?? undefined,
     onboardingComplete: row.onboardingComplete,
@@ -32,6 +33,7 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     data: {
       name?: string;
       currency?: string;
+      timezone?: string;
       address?: Business['address'];
       logoUrl?: string;
       onboardingComplete?: boolean;
@@ -43,6 +45,7 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     const changes: Partial<typeof businesses.$inferInsert> = { updatedAt: new Date() };
     if (data.name !== undefined) changes.name = data.name;
     if (data.currency !== undefined) changes.currency = data.currency;
+    if (data.timezone !== undefined) changes.timezone = data.timezone;
     if (data.logoUrl !== undefined) changes.logoUrl = data.logoUrl;
     if (data.address !== undefined) changes.address = data.address;
     if (data.onboardingComplete !== undefined) changes.onboardingComplete = data.onboardingComplete;

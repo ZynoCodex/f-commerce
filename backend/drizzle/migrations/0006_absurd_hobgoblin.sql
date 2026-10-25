@@ -1,0 +1,1 @@
+ALTER TABLE "businesses" ADD COLUMN "timezone" text DEFAULT 'Asia/Dhaka' NOT NULL;

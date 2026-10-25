@@ -2,6 +2,42 @@ import { z } from 'zod';
 
 export const CurrencyEnum = z.enum(['BDT', 'USD', 'EUR', 'GBP']);
 
+/**
+ * Resolve a value through the runtime's own IANA timezone data. Returns the
+ * canonical ID, or null when the runtime does not recognize the value.
+ */
+function resolveTimeZone(value: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A bare `UTC` or an `Area/Location` style IANA ID. This rejects fixed offsets
+ * such as `+06:00` and abbreviations such as `BST`, both of which the runtime
+ * would otherwise accept as legacy aliases.
+ */
+const IANA_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)+$/;
+
+function isIanaTimeZoneId(value: string): boolean {
+  return value === 'UTC' || IANA_ID_PATTERN.test(value);
+}
+
+/**
+ * An IANA timezone ID accepted by the runtime, stored in canonical form.
+ * Fixed offsets and abbreviations are rejected because they do not survive
+ * daylight saving changes.
+ */
+export const TimezoneSchema = z
+  .string()
+  .trim()
+  .min(1, 'Timezone is required')
+  .max(64, 'Timezone must be 64 characters or fewer')
+  .refine((value) => isIanaTimeZoneId(value) && resolveTimeZone(value) !== null, 'Invalid timezone')
+  .transform((value) => resolveTimeZone(value) ?? value);
+
 export const AddressSchema = z.object({
   street: z.string().min(1, 'Street is required'),
   city: z.string().min(1, 'City is required'),
@@ -13,6 +49,7 @@ export const AddressSchema = z.object({
 export const BusinessProfileSchema = z.object({
   name: z.string().min(1, 'Business name is required'),
   currency: CurrencyEnum,
+  timezone: TimezoneSchema,
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')),
   address: AddressSchema,
   onboardingComplete: z.boolean().optional(),
@@ -26,6 +63,7 @@ export const BusinessProfileSchema = z.object({
 export const BusinessProfileUpdateSchema = z.object({
   name: z.string().min(1, 'Business name is required').optional(),
   currency: CurrencyEnum.optional(),
+  timezone: TimezoneSchema.optional(),
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')).optional(),
   address: AddressSchema.optional(),
 });
@@ -45,6 +83,7 @@ const DraftAddressSchema = z.object({
 export const DraftSaveSchema = z.discriminatedUnion('field', [
   z.object({ field: z.literal('name'), value: z.string().min(1) }),
   z.object({ field: z.literal('currency'), value: CurrencyEnum }),
+  z.object({ field: z.literal('timezone'), value: TimezoneSchema }),
   z.object({ field: z.literal('address'), value: DraftAddressSchema }),
   z.object({ field: z.literal('logoUrl'), value: z.string().url().or(z.literal('')) }),
 ]);
@@ -54,6 +93,7 @@ export const BusinessResponseSchema = z.object({
   data: z.object({
     name: z.string(),
     currency: CurrencyEnum,
+    timezone: z.string(),
     logoUrl: z.string().url().nullable(),
     address: AddressSchema.nullable(),
     onboardingComplete: z.boolean(),
@@ -62,6 +102,7 @@ export const BusinessResponseSchema = z.object({
 });
 
 export type Currency = z.infer<typeof CurrencyEnum>;
+export type Timezone = z.infer<typeof TimezoneSchema>;
 export type Address = z.infer<typeof AddressSchema>;
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
 export type BusinessProfileUpdate = z.infer<typeof BusinessProfileUpdateSchema>;

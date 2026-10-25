@@ -1,7 +1,7 @@
 # 0008. Business timezone for delivery dates and timestamps
 
 **Date**: 2026-10-25
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

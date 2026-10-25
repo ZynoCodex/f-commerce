@@ -23,6 +23,7 @@ async function seedBusiness(): Promise<void> {
       id: BIZ,
       name: 'Test Co',
       currency: 'BDT',
+      timezone: 'Europe/London',
       logoUrl: 'https://res.cloudinary.com/demo/img.png',
       address: ADDRESS,
       onboardingComplete: true,
@@ -54,6 +55,7 @@ describe('DrizzleBusinessRepository', () => {
         id: BIZ,
         name: 'Test Co',
         currency: 'BDT',
+        timezone: 'Europe/London',
         logoUrl: 'https://res.cloudinary.com/demo/img.png',
         address: ADDRESS,
         onboardingComplete: true,
@@ -77,10 +79,12 @@ describe('DrizzleBusinessRepository', () => {
       const result = await repository.updateProfile(BIZ, {
         name: 'Updated Name',
         currency: 'USD',
+        timezone: 'America/New_York',
       });
 
       expect(result?.name).toBe('Updated Name');
       expect(result?.currency).toBe('USD');
+      expect(result?.timezone).toBe('America/New_York');
       // Fields that were not provided keep their stored value.
       expect(result?.logoUrl).toBe('https://res.cloudinary.com/demo/img.png');
       expect(result?.address).toEqual(ADDRESS);
@@ -90,6 +94,7 @@ describe('DrizzleBusinessRepository', () => {
       const result = await repository.updateProfile(BIZ, {
         name: 'New',
         currency: undefined,
+        timezone: undefined,
         logoUrl: undefined,
         address: undefined,
         onboardingComplete: undefined,
@@ -98,6 +103,7 @@ describe('DrizzleBusinessRepository', () => {
 
       expect(result?.name).toBe('New');
       expect(result?.currency).toBe('BDT');
+      expect(result?.timezone).toBe('Europe/London');
       expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
     });
 
@@ -113,6 +119,15 @@ describe('DrizzleBusinessRepository', () => {
 
     it('returns null when the row is not found', async () => {
       expect(await repository.updateProfile(MISSING, { name: 'X' })).toBeNull();
+    });
+
+    it('applies the Asia/Dhaka database default when a new business omits timezone', async () => {
+      const result = await getDb()
+        .insert(businesses)
+        .values({ name: 'Default Co', currency: 'BDT' })
+        .returning();
+
+      expect(result[0]?.timezone).toBe('Asia/Dhaka');
     });
   });
 

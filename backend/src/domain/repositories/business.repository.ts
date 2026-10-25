@@ -7,6 +7,7 @@ export interface IBusinessRepository {
     data: {
       name?: string;
       currency?: string;
+      timezone?: string;
       address?: Business['address'];
       logoUrl?: string;
       onboardingComplete?: boolean;
