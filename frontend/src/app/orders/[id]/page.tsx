@@ -22,7 +22,7 @@ import { OrderForm } from '@/components/orders/order-form';
 import { OrderStatusBadge } from '@/components/orders/order-status';
 import { isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
-import { getBusinessCurrency } from '@/lib/catalog-client';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { formatDateTime, formatMoney } from '@/lib/catalog-format';
 import { OrderDeadlineSummary } from '@/components/orders/order-deadline';
 import { OrderApiError, changeOrderStatus, getOrder } from '@/lib/order-client';
@@ -67,9 +67,9 @@ export default function OrderDetailPage() {
   const ready = useRequireAuth();
   const params = useParams<{ id: string }>();
   const orderId = params.id;
+  const { currency } = useBusinessSettings();
 
   const [order, setOrder] = useState<OrderDto | null>(null);
-  const [currency, setCurrency] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -83,11 +83,10 @@ export default function OrderDetailPage() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([getOrder(orderId), getBusinessCurrency()])
-      .then(([nextOrder, nextCurrency]) => {
+    getOrder(orderId)
+      .then((nextOrder) => {
         if (cancelled) return;
         setOrder(nextOrder);
-        setCurrency(nextCurrency);
         setError(null);
       })
       .catch((err: unknown) => {

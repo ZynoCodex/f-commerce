@@ -1,5 +1,22 @@
+import { removeBusinessSettingsCache } from './business-settings-cache';
+
 const TOKEN_KEY = 'accessToken';
 const BUSINESS_ID_KEY = 'businessId';
+
+type AuthListener = () => void;
+const authListeners = new Set<AuthListener>();
+
+/** Notify the shared business settings provider when the active auth changes. */
+export function subscribeToAuth(listener: AuthListener): () => void {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+}
+
+function notifyAuthChange(): void {
+  authListeners.forEach((listener) => listener());
+}
 
 export interface AuthUser {
   accessToken: string;
@@ -9,6 +26,7 @@ export interface AuthUser {
 export function setAuth(user: AuthUser): void {
   localStorage.setItem(TOKEN_KEY, user.accessToken);
   localStorage.setItem(BUSINESS_ID_KEY, user.businessId);
+  notifyAuthChange();
 }
 
 export function getAuth(): AuthUser | null {
@@ -19,8 +37,12 @@ export function getAuth(): AuthUser | null {
 }
 
 export function clearAuth(): void {
+  const businessId = localStorage.getItem(BUSINESS_ID_KEY);
+  if (businessId) removeBusinessSettingsCache(businessId);
+
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(BUSINESS_ID_KEY);
+  notifyAuthChange();
 }
 
 export function getAuthHeaders(): Record<string, string> {

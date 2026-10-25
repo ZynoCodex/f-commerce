@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -8,27 +7,12 @@ import { AppShell } from '@/components/shell/shell';
 import { Skeleton } from '@/components/ui/primitives';
 import { OrderForm } from '@/components/orders/order-form';
 import { useRequireAuth } from '@/lib/auth-guard';
-import { getBusinessCurrency } from '@/lib/catalog-client';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 
 export default function NewOrderPage() {
   const ready = useRequireAuth();
   const router = useRouter();
-  const [currency, setCurrency] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    getBusinessCurrency()
-      .then((next) => {
-        if (!cancelled) setCurrency(next);
-      })
-      .catch(() => {
-        // Amounts stay readable without a currency suffix.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { currency } = useBusinessSettings();
 
   if (!ready) {
     return (

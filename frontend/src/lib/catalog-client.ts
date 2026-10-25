@@ -231,20 +231,3 @@ export async function deleteCategory(id: string): Promise<void> {
   const response = await apiFetch(`/api/categories/${id}`, { method: 'DELETE' });
   return parseResponse<void>(response);
 }
-
-/** Currency only decorates prices, so a failure here leaves the numbers bare. */
-export async function getBusinessCurrency(): Promise<string> {
-  const response = await apiFetch('/api/business/me');
-  if (!response.ok) return '';
-
-  try {
-    const payload: unknown = await response.json();
-    if (isRecord(payload) && isRecord(payload.data) && typeof payload.data.currency === 'string') {
-      return payload.data.currency;
-    }
-  } catch {
-    return '';
-  }
-
-  return '';
-}

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/primitives';
 import { OrderStatusBadge } from '@/components/orders/order-status';
 import { OrderDeadlineCell } from '@/components/orders/order-deadline';
-import { getBusinessCurrency } from '@/lib/catalog-client';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { formatDateTime, formatMoney } from '@/lib/catalog-format';
 import { useRequireAuth } from '@/lib/auth-guard';
 import { listOrders } from '@/lib/order-client';
@@ -50,6 +50,7 @@ function statusesForFilter(filter: StatusFilter): OrderStatusType[] | undefined 
 
 export default function OrdersPage() {
   const ready = useRequireAuth();
+  const { currency } = useBusinessSettings();
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -59,7 +60,6 @@ export default function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const [currency, setCurrency] = useState('');
   const requestEpoch = useRef(0);
 
   /** Invalidate any in flight page request when the list view changes. */
@@ -100,21 +100,6 @@ export default function OrdersPage() {
       cancelled = true;
     };
   }, [debouncedQuery, filter, reloadToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getBusinessCurrency()
-      .then((next) => {
-        if (!cancelled) setCurrency(next);
-      })
-      .catch(() => {
-        // Amounts stay readable without a currency suffix.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const loadMore = async () => {
     if (nextCursor === null || isLoading) return;

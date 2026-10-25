@@ -31,12 +31,12 @@ import {
 import { CategoryManager } from '@/components/catalog/category-manager';
 import { ProductFields } from '@/components/catalog/product-form';
 import { StockBadge } from '@/components/catalog/stock-badge';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import {
   CatalogApiError,
   createProduct,
-  getBusinessCurrency,
   listCategories,
   listProducts,
   uploadProductImages,
@@ -114,6 +114,7 @@ function ProductNameCell({ product }: { product: ProductDto }) {
 
 export default function ProductsPage() {
   const ready = useRequireAuth();
+  const { currency } = useBusinessSettings();
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -132,7 +133,6 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [currency, setCurrency] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -193,21 +193,6 @@ export default function ProductsPage() {
       })
       .catch((err: unknown) => {
         if (!cancelled) setCategoryError(catalogMessage(err));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    getBusinessCurrency()
-      .then((next) => {
-        if (!cancelled) setCurrency(next);
-      })
-      .catch(() => {
-        // Prices stay readable without a currency suffix.
       });
 
     return () => {

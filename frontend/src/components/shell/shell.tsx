@@ -26,6 +26,8 @@ import {
   StatusPill,
 } from '@/components/ui/primitives';
 import { ThemeToggle } from '@/components/theme/theme';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { formatBusinessDayLabel, todayInTimeZone } from '@/lib/timezone';
 
 type RouteItem = {
   href: string;
@@ -89,6 +91,10 @@ function MoreMenu({ pathname, onClose }: { pathname: string; onClose: () => void
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { currency, timezone, mounted } = useBusinessSettings();
+  const businessDay = mounted ? todayInTimeZone(timezone) : null;
+  const businessDayLabel = mounted ? formatBusinessDayLabel(timezone) : null;
+  const badgeLabel = currency ? `${timezone} · ${currency}` : timezone;
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -125,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <ThemeToggle />
           </div>
-          <Badge>Bangladesh · BDT</Badge>
+          <Badge>{badgeLabel}</Badge>
         </div>
       </aside>
 
@@ -137,8 +143,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Boxes aria-hidden="true" size={18} />
               </span>
               <div>
-                <p className="font-mono text-[0.7rem] uppercase tracking-widest text-sky-strong">
-                  Tuesday, 9 September
+                <p className="min-h-4 font-mono text-[0.7rem] uppercase tracking-widest text-sky-strong">
+                  {businessDay && businessDayLabel ? (
+                    <time dateTime={businessDay}>{businessDayLabel}</time>
+                  ) : null}
                 </p>
                 <h1 className="text-lg font-semibold text-ink">Good morning, Maya</h1>
               </div>

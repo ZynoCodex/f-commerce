@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DM_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { ThemeBoundary } from '@/components/theme/theme';
+import { BusinessSettingsProvider } from '@/components/business/business-settings-provider';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -32,7 +33,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       {/* Grammarly and similar extensions add attributes to body before React hydrates. */}
       <body suppressHydrationWarning>
-        <ThemeBoundary>{children}</ThemeBoundary>
+        <ThemeBoundary>
+          <BusinessSettingsProvider>{children}</BusinessSettingsProvider>
+        </ThemeBoundary>
       </body>
     </html>
   );
