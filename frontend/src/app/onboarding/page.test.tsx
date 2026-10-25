@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { render } from '@/test-utils/render';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +26,7 @@ function jsonResponse(status: number, body: object): Response {
 const incompleteBusiness = {
   name: 'Maya Traders',
   currency: 'BDT',
+  timezone: 'Asia/Dhaka',
   logoUrl: '',
   address: null,
   onboardingComplete: false,
@@ -162,24 +164,178 @@ describe('OnboardingPage', () => {
     expect(greeting).toBeVisible();
   });
 
+  it('covers AC-5: restores a valid draft timezone on step three', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Europe/Berlin',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: withDraft })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
+  });
+
+  it('covers AC-5: ignores an invalid draft timezone and keeps the browser prefill', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Mars/Olympus',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: withDraft })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    const select = screen.getByLabelText(/timezone/i) as HTMLSelectElement;
+    expect(select.value).not.toBe('Mars/Olympus');
+    expect(Array.from(select.options).map((option) => option.value)).toContain(select.value);
+  });
+
+  it('covers AC-5: saves a changed timezone as a draft', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding/draft' && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(200, { success: true, message: 'Draft saved' }));
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/London');
+
+    await waitFor(
+      () => {
+        const draftCall = fetchMock.mock.calls.find(
+          (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
+        );
+        expect(draftCall).toBeTruthy();
+      },
+      { timeout: 2000 },
+    );
+
+    const draftCall = fetchMock.mock.calls.find(
+      (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
+    );
+    const draftBody = JSON.parse(String(draftCall![1]!.body));
+    expect(draftBody.field).toBe('timezone');
+    expect(draftBody.value).toBe('Europe/London');
+  });
+
+  it('covers AC-5: shows the timezone on review and sends it with completion', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Europe/Berlin',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              name: 'Maya Traders',
+              currency: 'USD',
+              timezone: 'Europe/Berlin',
+              onboardingComplete: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: withDraft }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    expect(screen.getByText(/Europe\/Berlin/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /enter order desk/i }));
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
+    const onboardingCall = fetchMock.mock.calls.find(
+      (call) => call[0] === '/api/business/onboarding' && call[1]?.method === 'PUT',
+    );
+    expect(JSON.parse(String(onboardingCall![1]!.body)).timezone).toBe('Europe/Berlin');
+  });
+
   it('pre-fills business name from onboarding endpoint when business/me returns 403', async () => {
-    const fetchMock = vi
-      .fn()
-      // First call: GET /api/business/me returns 403 (onboarding required)
-      .mockResolvedValueOnce(
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      void init;
+      if (url === '/api/business/onboarding') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: { name: 'Registered Biz Name', onboardingDraft: null },
+            message: 'Onboarding retrieved',
+          }),
+        );
+      }
+      return Promise.resolve(
         jsonResponse(403, {
           error: 'Onboarding required',
           message: 'Please complete your business profile before accessing this resource',
         }),
-      )
-      // Second call: GET /api/business/onboarding returns the business name from registration
-      .mockResolvedValueOnce(
-        jsonResponse(200, {
-          success: true,
-          data: { name: 'Registered Biz Name', onboardingDraft: null },
-          message: 'Onboarding retrieved',
-        }),
       );
+    });
     vi.stubGlobal('fetch', fetchMock);
     setAuth({ accessToken: 'tok', businessId: 'b1' });
 
@@ -258,12 +414,22 @@ describe('OnboardingPage', () => {
   });
 
   it('covers AC-4: completes onboarding and redirects to the dashboard', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { success: true, data: incompleteBusiness }))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { success: true, data: { onboardingComplete: true } }),
-      );
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              name: 'Maya Traders',
+              currency: 'BDT',
+              timezone: 'Asia/Dhaka',
+              onboardingComplete: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -342,7 +508,7 @@ describe('OnboardingPage', () => {
     const draftCall = fetchMock.mock.calls.find(
       (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
     );
-    const draftBody = JSON.parse(draftCall![1].body);
+    const draftBody = JSON.parse(String(draftCall![1]!.body));
     expect(draftBody.field).toBe('address');
     expect(draftBody.value.street).toBe('123 New St');
   });

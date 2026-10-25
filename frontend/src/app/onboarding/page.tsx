@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation';
 import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
-import type { BusinessProfile } from '@f-commerce/contracts';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { TimezoneSelect, browserTimeZone } from '@/components/business/timezone-select';
+import { DEFAULT_TIME_ZONE } from '@/lib/timezone';
+import { TimezoneSchema, type BusinessProfile } from '@f-commerce/contracts';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -21,15 +24,17 @@ type Address = {
 type OnboardingForm = {
   name: string;
   currency: BusinessProfile['currency'];
+  timezone: string;
   address: Address;
   logoUrl: string;
 };
 
-type DraftField = 'currency' | 'address';
+type DraftField = 'currency' | 'timezone' | 'address';
 
 // Cache to track saved draft values and avoid redundant API calls
 const savedDraftCache: Record<DraftField, string> = {
   currency: '',
+  timezone: '',
   address: '',
 };
 
@@ -72,6 +77,7 @@ function scheduleDraftSave(field: DraftField, value: unknown) {
 type BusinessData = {
   name: string;
   currency: string;
+  timezone: string;
   logoUrl: string | null;
   address: Address | null;
   onboardingComplete: boolean;
@@ -80,6 +86,7 @@ type BusinessData = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { updateSettings } = useBusinessSettings();
 
   // Gate the whole flow behind authentication before any API call.
   // All hooks below are called unconditionally so hook order is stable
@@ -96,6 +103,7 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<OnboardingForm>({
     name: '',
     currency: 'BDT',
+    timezone: DEFAULT_TIME_ZONE,
     address: {
       street: '',
       city: '',
@@ -143,26 +151,30 @@ export default function OnboardingPage() {
             const currency = (draft.currency ||
               data.data.currency ||
               'BDT') as BusinessProfile['currency'];
+            const draftTimeZone = TimezoneSchema.safeParse(draft.timezone);
+            const timezone = draftTimeZone.success ? draftTimeZone.data : browserTimeZone();
             const address = draft.address || data.data.address || form.address;
             const logoUrl = draft.logoUrl || data.data.logoUrl || '';
 
             setForm({
               name: businessName,
               currency,
+              timezone,
               address,
               logoUrl,
             });
 
             // Update draft cache with loaded values
             savedDraftCache.currency = currency;
+            savedDraftCache.timezone = timezone;
             savedDraftCache.address = JSON.stringify(address);
 
             if (draft.logoUrl || data.data.logoUrl) {
               setLogoPreview(draft.logoUrl || data.data.logoUrl || null);
             }
           } else {
-            // No draft yet — just pre-fill the name from DB
-            setForm((prev) => ({ ...prev, name: businessName }));
+            // No draft yet — pre-fill the name and the browser zone.
+            setForm((prev) => ({ ...prev, name: businessName, timezone: browserTimeZone() }));
           }
         }
       })
@@ -229,6 +241,12 @@ export default function OnboardingPage() {
   };
 
   const completeOnboarding = async () => {
+    const parsedTimeZone = TimezoneSchema.safeParse(form.timezone);
+    if (!parsedTimeZone.success) {
+      setError('Choose a valid timezone before finishing.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -239,6 +257,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: form.name,
           currency: form.currency,
+          timezone: parsedTimeZone.data,
           address: form.address,
           logoUrl: form.logoUrl,
         }),
@@ -247,6 +266,12 @@ export default function OnboardingPage() {
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || 'Failed to complete onboarding');
+      }
+
+      const data = await res.json();
+      const saved = data.data as { currency?: unknown; timezone?: unknown };
+      if (typeof saved.currency === 'string' && typeof saved.timezone === 'string') {
+        updateSettings({ currency: saved.currency, timezone: saved.timezone });
       }
 
       router.replace('/dashboard');
@@ -448,9 +473,26 @@ function StepThree({
     scheduleDraftSave('currency', value);
   };
 
+  const [timeZoneError, setTimeZoneError] = useState<string | null>(null);
+
+  const handleTimeZoneChange = (value: string) => {
+    setForm({ ...form, timezone: value });
+    scheduleDraftSave('timezone', value);
+    setTimeZoneError(null);
+  };
+
+  const continueWithTimeZone = () => {
+    const parsed = TimezoneSchema.safeParse(form.timezone);
+    if (!parsed.success) {
+      setTimeZoneError('Choose a valid timezone.');
+      return;
+    }
+    onNext();
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Your currency and logo</h1>
+      <h1 className="text-2xl font-semibold text-ink">Your currency, timezone, and logo</h1>
       <p className="text-sm text-body">
         This is how your customers will see prices and identify your business.
       </p>
@@ -466,6 +508,15 @@ function StepThree({
           <option value="EUR">EUR - Euro</option>
           <option value="GBP">GBP - British Pound</option>
         </Select>
+      </Field>
+
+      <Field
+        label="Timezone"
+        htmlFor="timezone"
+        description="Used for delivery deadlines and timestamps."
+        error={timeZoneError ?? undefined}
+      >
+        <TimezoneSelect id="timezone" value={form.timezone} onChange={handleTimeZoneChange} />
       </Field>
 
       <Field label="Business logo" htmlFor="logo-upload" description="JPEG, PNG, or WebP. Max 5MB.">
@@ -504,7 +555,7 @@ function StepThree({
         <Button variant="secondary" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={onNext}>Continue</Button>
+        <Button onClick={continueWithTimeZone}>Continue</Button>
       </div>
     </div>
   );
@@ -546,7 +597,9 @@ function StepFour({
           )}
           <div>
             <p className="font-semibold text-ink">{form.name || 'Unnamed business'}</p>
-            <p className="text-sm text-muted">{form.currency}</p>
+            <p className="text-sm text-muted">
+              {form.currency} · {form.timezone}
+            </p>
           </div>
         </div>
 

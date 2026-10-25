@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
+import { Button, Dialog, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
-import type { BusinessProfile } from '@f-commerce/contracts';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { TimezoneSelect } from '@/components/business/timezone-select';
+import { DEFAULT_TIME_ZONE } from '@/lib/timezone';
+import { TimezoneSchema, type BusinessProfile } from '@f-commerce/contracts';
 
 type Address = {
   street: string;
@@ -18,6 +21,7 @@ type Address = {
 type BusinessData = {
   name: string;
   currency: string;
+  timezone: string;
   logoUrl: string | null;
   address: Address | null;
   onboardingComplete: boolean;
@@ -27,15 +31,19 @@ export default function SettingsPage() {
   // Gate behind authentication. All hooks below are called unconditionally
   // so hook order is stable across the ready/not-ready renders.
   const ready = useRequireAuth();
+  const { updateSettings } = useBusinessSettings();
   const [business, setBusiness] = useState<BusinessData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [baselineTimeZone, setBaselineTimeZone] = useState(DEFAULT_TIME_ZONE);
+  const [pendingTimeZone, setPendingTimeZone] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: '',
     currency: 'BDT' as BusinessProfile['currency'],
+    timezone: DEFAULT_TIME_ZONE,
     address: {
       street: '',
       city: '',
@@ -60,10 +68,15 @@ export default function SettingsPage() {
       .then((data) => {
         if (!cancelled) {
           const b = data.data;
+          const parsedTimeZone = TimezoneSchema.safeParse(b.timezone);
+          const timezone = parsedTimeZone.success ? parsedTimeZone.data : DEFAULT_TIME_ZONE;
+
           setBusiness(b);
+          setBaselineTimeZone(timezone);
           setForm({
             name: b.name,
             currency: (b.currency || 'BDT') as BusinessProfile['currency'],
+            timezone,
             address: b.address
               ? {
                   street: b.address.street,
@@ -96,7 +109,7 @@ export default function SettingsPage() {
 
   if (!ready) return <div className="p-8">Loading...</div>;
 
-  const saveProfile = async () => {
+  const submitProfile = async (timeZone: string) => {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
@@ -105,7 +118,7 @@ export default function SettingsPage() {
       const res = await apiFetch('/api/business/me', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, timezone: timeZone }),
       });
 
       if (!res.ok) {
@@ -113,12 +126,44 @@ export default function SettingsPage() {
         throw new Error(data.message || data.error || 'Failed to save profile');
       }
 
+      const data = await res.json();
+      const saved = data.data as { currency?: unknown; timezone?: unknown };
+      const savedTimeZone = TimezoneSchema.safeParse(saved.timezone);
+      const nextTimeZone = savedTimeZone.success ? savedTimeZone.data : timeZone;
+
+      if (typeof saved.currency === 'string') {
+        updateSettings({ currency: saved.currency, timezone: nextTimeZone });
+      }
+
+      setBaselineTimeZone(nextTimeZone);
+      setForm((prev) => ({ ...prev, timezone: nextTimeZone }));
+      setPendingTimeZone(null);
       setSuccess('Profile updated');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const saveProfile = () => {
+    const parsedTimeZone = TimezoneSchema.safeParse(form.timezone);
+    if (!parsedTimeZone.success) {
+      setError('Choose a valid timezone.');
+      return;
+    }
+
+    if (parsedTimeZone.data !== baselineTimeZone) {
+      setPendingTimeZone(parsedTimeZone.data);
+      return;
+    }
+
+    void submitProfile(parsedTimeZone.data);
+  };
+
+  const cancelTimeZoneChange = () => {
+    setPendingTimeZone(null);
+    setForm((prev) => ({ ...prev, timezone: baselineTimeZone }));
   };
 
   if (isLoading) {
@@ -179,6 +224,18 @@ export default function SettingsPage() {
             <option value="EUR">EUR - Euro</option>
             <option value="GBP">GBP - British Pound</option>
           </Select>
+        </Field>
+
+        <Field
+          label="Timezone"
+          htmlFor="timezone"
+          description="Used for delivery dates and timestamps."
+        >
+          <TimezoneSelect
+            id="timezone"
+            value={form.timezone}
+            onChange={(timezone) => setForm({ ...form, timezone })}
+          />
         </Field>
 
         <Field label="Street" htmlFor="street">
@@ -244,6 +301,30 @@ export default function SettingsPage() {
           {isSaving ? 'Saving...' : 'Save changes'}
         </Button>
       </div>
+
+      <Dialog
+        open={pendingTimeZone !== null}
+        onClose={cancelTimeZoneChange}
+        title="Change the business timezone?"
+        description={pendingTimeZone ? `New timezone: ${pendingTimeZone}` : undefined}
+      >
+        <p className="text-sm text-body">
+          Existing order dates do not change, but which orders show as overdue may change.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={cancelTimeZoneChange} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (pendingTimeZone) void submitProfile(pendingTimeZone);
+            }}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Change timezone'}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
