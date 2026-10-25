@@ -149,10 +149,10 @@ Every business stores one IANA timezone and the console uses it for delivery dea
 - [x] Design it (spec): `/architect business timezone`
       Spec [0008](../specs/0008-business-timezone/index.md)
 - [ ] Build it: `/develop business timezone`
-  - [ ] Data, contracts, and profile API: the column, entity, draft type, schema, migration, repository, and read and write endpoints (AC-1, AC-2, AC-3, AC-4)
-  - [ ] Shared provider, cache, auth change signal, shell badge, header date, and currency call replacement (AC-7, AC-11)
-  - [ ] Onboarding and settings fields, grouped select, prefill, draft, confirmation dialog, and provider update (AC-5, AC-6, AC-12)
-  - [ ] Timestamp formatters, deadline warning, Overdue badge, backend day helper, and tests (AC-8, AC-9, AC-10)
+  - [x] Data, contracts, and profile API: the column, entity, draft type, schema, migration, repository, and read and write endpoints (AC-1, AC-2, AC-3, AC-4)
+  - [x] Shared provider, cache, auth change signal, shell badge, header date, and currency call replacement (AC-7, AC-11)
+  - [x] Onboarding and settings fields, grouped select, prefill, draft, confirmation dialog, and provider update (AC-5, AC-6, AC-12)
+  - [x] Timestamp formatters, deadline warning, Overdue badge, backend day helper, and tests (AC-8, AC-9, AC-10)
   - [ ] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
 - [ ] Verify it: `/check verify business timezone`
 - [ ] Test it: `/test business timezone`
