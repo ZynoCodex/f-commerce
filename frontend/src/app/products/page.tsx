@@ -660,7 +660,8 @@ export default function ProductsPage() {
         </section>
 
         {isLoading && rows.length === 0 && (
-          <div className="grid gap-3">
+          <div className="grid gap-3" role="status">
+            <span className="sr-only">Loading products…</span>
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
@@ -676,45 +677,52 @@ export default function ProductsPage() {
         {error && <ErrorState onRetry={retry}>{error}</ErrorState>}
 
         {!isLoading && !error && rows.length === 0 && (
-          <EmptyState>
-            <div>
-              <Package aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
-              {filtersActive ? (
-                <>
-                  <p className="font-semibold text-ink">No products match these filters</p>
-                  <p className="mt-1 text-sm text-body">
-                    Try another search, or clear a filter to see the whole catalog.
-                  </p>
-                  <Button className="mt-4" onClick={clearFilters} type="button" variant="secondary">
-                    Clear filters
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="font-semibold text-ink">No products yet</p>
-                  <p className="mt-1 text-sm text-body">
-                    {categories.length === 0
-                      ? 'Create a category first, then add your first product.'
-                      : 'Add your first product to track stock, variants, and prices.'}
-                  </p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => {
-                      if (categories.length === 0) {
-                        setCategoryOpen(true);
-                      } else {
-                        openCreate();
-                      }
-                    }}
-                    type="button"
-                  >
-                    <Plus aria-hidden="true" size={18} />
-                    {categories.length === 0 ? 'Manage categories' : 'Add product'}
-                  </Button>
-                </>
-              )}
-            </div>
-          </EmptyState>
+          <div role="status">
+            <EmptyState>
+              <div>
+                <Package aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
+                {filtersActive ? (
+                  <>
+                    <p className="font-semibold text-ink">No products match these filters</p>
+                    <p className="mt-1 text-sm text-body">
+                      Try another search, or clear a filter to see the whole catalog.
+                    </p>
+                    <Button
+                      className="mt-4"
+                      onClick={clearFilters}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Clear filters
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-ink">No products yet</p>
+                    <p className="mt-1 text-sm text-body">
+                      {categories.length === 0
+                        ? 'Create a category first, then add your first product.'
+                        : 'Add your first product to track stock, variants, and prices.'}
+                    </p>
+                    <Button
+                      className="mt-4"
+                      onClick={() => {
+                        if (categories.length === 0) {
+                          setCategoryOpen(true);
+                        } else {
+                          openCreate();
+                        }
+                      }}
+                      type="button"
+                    >
+                      <Plus aria-hidden="true" size={18} />
+                      {categories.length === 0 ? 'Manage categories' : 'Add product'}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </EmptyState>
+          </div>
         )}
 
         {rows.length > 0 && (

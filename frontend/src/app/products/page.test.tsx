@@ -207,6 +207,26 @@ describe('ProductsPage', () => {
     expect(screen.queryByRole('img', { name: 'Plain tee image' })).not.toBeInTheDocument();
   });
 
+  // covers AC-14: the first list load is announced, not just drawn as skeletons
+  it('announces the first list load', () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/products?')) {
+        return new Promise<Response>(() => {});
+      }
+      if (url === '/api/categories') {
+        return Promise.resolve(jsonResponse(200, { success: true, data: [category] }));
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: { currency: 'BDT' } }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    const loading = screen.getByText('Loading products…');
+    expect(loading.closest('[role="status"]')).not.toBeNull();
+  });
+
   it('shows the empty catalog state and the add action', async () => {
     installedFetch((url) => {
       if (url.startsWith('/api/products?')) {
@@ -223,7 +243,9 @@ describe('ProductsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('No products yet')).toBeVisible();
+    const empty = await screen.findByText('No products yet');
+    expect(empty).toBeVisible();
+    expect(empty.closest('[role="status"]')).not.toBeNull();
     expect(screen.getAllByRole('button', { name: /add product/i }).length).toBeGreaterThan(0);
   });
 
