@@ -10,29 +10,30 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## At a glance
 
-| #   | Feature                           | Phase      | Status  |
-| --- | --------------------------------- | ---------- | ------- |
-| 1   | Stack & architecture              | Foundation | done    |
-| 2   | Data model                        | Foundation | done    |
-| 3   | Coding standards & tooling        | Foundation | done    |
-| 4   | Design system & UI foundation     | Foundation | done    |
-| 5   | Authentication & tenant isolation | Slice 1    | done    |
-| 6   | Business profile & onboarding     | Slice 1    | done    |
-| 7   | Customers                         | Slice 1    | done    |
-| 8   | Products & categories             | Slice 2    | done    |
-| 9   | Orders (CRUD + status workflow)   | Slice 2    | done    |
-| 10  | Payments                          | Slice 2    | planned |
-| 11  | Inventory management              | Slice 4    | planned |
-| 12  | Delivery & shipping               | Slice 4    | planned |
-| 13  | Expenses & profit calculation     | Slice 4    | planned |
-| 14  | Dashboard                         | Slice 4    | planned |
-| 15  | Reports                           | Slice 5    | planned |
-| 16  | Search & filters                  | Slice 5    | planned |
-| 17  | Notifications                     | Slice 5    | planned |
-| 18  | Invoice generation                | Slice 5    | planned |
-| 19  | OAuth provider login              | Slice 3    | planned |
-| 20  | Marketing site                    | Launch     | planned |
-| 21  | Product variant archiving         | Slice 2    | planned |
+| #   | Feature                           | Phase      | Status      |
+| --- | --------------------------------- | ---------- | ----------- |
+| 1   | Stack & architecture              | Foundation | done        |
+| 2   | Data model                        | Foundation | done        |
+| 3   | Coding standards & tooling        | Foundation | done        |
+| 4   | Design system & UI foundation     | Foundation | done        |
+| 5   | Authentication & tenant isolation | Slice 1    | done        |
+| 6   | Business profile & onboarding     | Slice 1    | done        |
+| 7   | Customers                         | Slice 1    | done        |
+| 8   | Products & categories             | Slice 2    | done        |
+| 9   | Orders (CRUD + status workflow)   | Slice 2    | done        |
+| 10  | Payments                          | Slice 2    | planned     |
+| 11  | Inventory management              | Slice 4    | planned     |
+| 12  | Delivery & shipping               | Slice 4    | planned     |
+| 13  | Expenses & profit calculation     | Slice 4    | planned     |
+| 14  | Dashboard                         | Slice 4    | planned     |
+| 15  | Reports                           | Slice 5    | planned     |
+| 16  | Search & filters                  | Slice 5    | planned     |
+| 17  | Notifications                     | Slice 5    | planned     |
+| 18  | Invoice generation                | Slice 5    | planned     |
+| 19  | OAuth provider login              | Slice 3    | planned     |
+| 20  | Marketing site                    | Launch     | planned     |
+| 21  | Product variant archiving         | Slice 2    | planned     |
+| 22  | Business timezone                 | Slice 1    | in-progress |
 
 ## Foundations
 
@@ -138,6 +139,25 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
 - [x] Test it: `/test customers`
 - [x] Review it (fresh model): `/check review customers` — See [2026-10-16-feat-customers.md](../reviews/2026-10-16-feat-customers.md)
 - [x] Document it: `/document customers` — See [2026-10-16-feat-customers.md](../PRs/2026-10-16-feat-customers.md)
+
+### 22. Business timezone · in-progress
+
+Every business stores one IANA timezone and the console uses it for delivery deadline checks, timestamps, and future server day boundaries. Onboarding asks for the zone, settings can change it with a confirmation, and existing businesses start on `Asia/Dhaka`.
+
+**Done when:** every console date and the Overdue badge follow the stored business timezone, two viewers in different browser zones see the same result for the same deadline, onboarding sets the zone, and settings can change it with a clear warning.
+
+- [x] Design it (spec): `/architect business timezone`
+      Spec [0008](../specs/0008-business-timezone/index.md)
+- [ ] Build it: `/develop business timezone`
+  - [ ] Data, contracts, and profile API: the column, entity, draft type, schema, migration, repository, and read and write endpoints (AC-1, AC-2, AC-3, AC-4)
+  - [ ] Shared provider, cache, auth change signal, shell badge, header date, and currency call replacement (AC-7, AC-11)
+  - [ ] Onboarding and settings fields, grouped select, prefill, draft, confirmation dialog, and provider update (AC-5, AC-6, AC-12)
+  - [ ] Timestamp formatters, deadline warning, Overdue badge, backend day helper, and tests (AC-8, AC-9, AC-10)
+  - [ ] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
+- [ ] Verify it: `/check verify business timezone`
+- [ ] Test it: `/test business timezone`
+- [ ] Review it (fresh model): `/check review business timezone`
+- [ ] Document it: `/document business timezone`
 
 ## Slice 2: Product & Order Workflow
 
