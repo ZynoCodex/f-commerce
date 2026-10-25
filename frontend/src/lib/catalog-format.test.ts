@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatDateOnly,
-  formatDateTime,
-  formatMoney,
-  isOverdue,
-  localToday,
-} from './catalog-format';
+import { formatDateOnly, formatDateTime, formatMoney, isOverdue } from './catalog-format';
 
 describe('money and date time formatting', () => {
   // covers AC-15 and AC-16: whole amounts print with the business currency, and absent money prints a dash
@@ -17,10 +11,25 @@ describe('money and date time formatting', () => {
     expect(formatMoney(undefined, 'BDT')).toBe('—');
   });
 
-  // covers AC-16: a valid timestamp prints as a date and an unexpected value passes through
-  it('formats a timestamp and passes an invalid one through', () => {
-    expect(formatDateTime('2026-10-20T10:00:00.000Z')).toContain('2026');
-    expect(formatDateTime('not-a-date')).toBe('not-a-date');
+  // covers AC-8: a timestamp is rendered in the business zone, not the browser zone
+  it('formats a timestamp in the requested zone', () => {
+    const lateUtc = '2026-10-25T20:00:00.000Z';
+
+    expect(formatDateTime(lateUtc, 'Asia/Dhaka')).toContain('Oct 26, 2026');
+    expect(formatDateTime(lateUtc, 'UTC')).toContain('Oct 25, 2026');
+    expect(formatDateTime(lateUtc, 'America/New_York')).toContain('Oct 25, 2026');
+  });
+
+  // covers AC-8: a bad zone falls back to Asia/Dhaka instead of throwing
+  it('falls back to Asia/Dhaka for an invalid zone', () => {
+    const value = '2026-10-25T20:00:00.000Z';
+
+    expect(formatDateTime(value, 'Mars/Olympus')).toBe(formatDateTime(value, 'Asia/Dhaka'));
+  });
+
+  // covers AC-8: an unexpected timestamp passes through unchanged
+  it('passes an invalid timestamp through', () => {
+    expect(formatDateTime('not-a-date', 'Asia/Dhaka')).toBe('not-a-date');
   });
 });
 
@@ -45,46 +54,29 @@ describe('date only formatter', () => {
   });
 });
 
-describe('local today', () => {
-  // covers AC-19: the viewer's calendar day comes from their local clock
-  it('reads the local calendar day with no timezone conversion', () => {
-    // A local time near midnight keeps its own day in local terms.
-    const nearMidnight = new Date(2026, 10, 5, 23, 30, 0);
-    expect(localToday(nearMidnight)).toBe('2026-11-05');
-
-    const earlyMorning = new Date(2026, 0, 1, 0, 15, 0);
-    expect(localToday(earlyMorning)).toBe('2026-01-01');
-  });
-
-  // covers AC-19: a single digit month and day are padded
-  it('pads a single digit month and day', () => {
-    expect(localToday(new Date(2026, 2, 7, 12, 0, 0))).toBe('2026-03-07');
-  });
-});
-
 describe('overdue derivation', () => {
-  const now = new Date(2026, 10, 5, 12, 0, 0); // local 2026-11-05
+  const today = '2026-11-05';
 
-  // covers AC-19: an active order past its promised day is overdue
+  // covers AC-9: an active order past the business day is overdue
   it('marks an active order past its promise as overdue', () => {
-    expect(isOverdue('2026-11-04', 'PENDING', now)).toBe(true);
-    expect(isOverdue('2026-11-04', 'CONFIRMED', now)).toBe(true);
-    expect(isOverdue('2026-11-04', 'PROCESSING', now)).toBe(true);
-    expect(isOverdue('2026-11-04', 'SHIPPED', now)).toBe(true);
+    expect(isOverdue('2026-11-04', 'PENDING', today)).toBe(true);
+    expect(isOverdue('2026-11-04', 'CONFIRMED', today)).toBe(true);
+    expect(isOverdue('2026-11-04', 'PROCESSING', today)).toBe(true);
+    expect(isOverdue('2026-11-04', 'SHIPPED', today)).toBe(true);
   });
 
-  // covers AC-19: a promise of today is not overdue, and a future promise is not either
+  // covers AC-9: a promise of today is not overdue, and a future promise is not either
   it('treats today and a future day as not overdue', () => {
-    expect(isOverdue('2026-11-05', 'PENDING', now)).toBe(false);
-    expect(isOverdue('2026-11-06', 'PENDING', now)).toBe(false);
+    expect(isOverdue('2026-11-05', 'PENDING', today)).toBe(false);
+    expect(isOverdue('2026-11-06', 'PENDING', today)).toBe(false);
   });
 
-  // covers AC-19: a finished order is never overdue, and no promise is never overdue
+  // covers AC-9: a finished order is never overdue, and no promise is never overdue
   it('never marks a delivered, cancelled, or returned order, and never a missing promise', () => {
-    expect(isOverdue('2026-11-04', 'DELIVERED', now)).toBe(false);
-    expect(isOverdue('2026-11-04', 'CANCELLED', now)).toBe(false);
-    expect(isOverdue('2026-11-04', 'RETURNED', now)).toBe(false);
-    expect(isOverdue(null, 'PENDING', now)).toBe(false);
-    expect(isOverdue(undefined, 'PENDING', now)).toBe(false);
+    expect(isOverdue('2026-11-04', 'DELIVERED', today)).toBe(false);
+    expect(isOverdue('2026-11-04', 'CANCELLED', today)).toBe(false);
+    expect(isOverdue('2026-11-04', 'RETURNED', today)).toBe(false);
+    expect(isOverdue(null, 'PENDING', today)).toBe(false);
+    expect(isOverdue(undefined, 'PENDING', today)).toBe(false);
   });
 });

@@ -134,7 +134,7 @@ export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
-  const { currency } = useBusinessSettings();
+  const { currency, timezone } = useBusinessSettings();
 
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -785,7 +785,7 @@ export default function ProductDetailPage() {
               </div>
               <div>
                 <dt className="text-muted">Updated</dt>
-                <dd className="mt-1 text-ink">{formatDateTime(product.updatedAt)}</dd>
+                <dd className="mt-1 text-ink">{formatDateTime(product.updatedAt, timezone)}</dd>
               </div>
             </dl>
           </Card>

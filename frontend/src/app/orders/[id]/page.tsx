@@ -67,7 +67,7 @@ export default function OrderDetailPage() {
   const ready = useRequireAuth();
   const params = useParams<{ id: string }>();
   const orderId = params.id;
-  const { currency } = useBusinessSettings();
+  const { currency, timezone } = useBusinessSettings();
 
   const [order, setOrder] = useState<OrderDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -228,7 +228,8 @@ export default function OrderDetailPage() {
                   <OrderStatusBadge status={order.status} />
                 </div>
                 <p className="mt-2 text-sm text-body">
-                  {orderSourceLabel(order.source)} · Placed {formatDateTime(order.createdAt)}
+                  {orderSourceLabel(order.source)} · Placed{' '}
+                  {formatDateTime(order.createdAt, timezone)}
                 </p>
               </div>
               {!editOpen && isOrderEditable(order.status) && (
@@ -380,7 +381,7 @@ export default function OrderDetailPage() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <OrderStatusBadge status={entry.toStatus} />
                                 <span className="text-sm text-muted">
-                                  {formatDateTime(entry.createdAt)}
+                                  {formatDateTime(entry.createdAt, timezone)}
                                 </span>
                               </div>
                               <p className="mt-2 text-sm text-body">

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrderDto, OrderStatusType, OrderSummaryDto } from '@f-commerce/contracts';
 
+import { render } from '@/test-utils/render';
 import { OrderDeadlineBadge, OrderDeadlineCell, OrderDeadlineSummary } from './order-deadline';
 
 const created = '2026-10-20T10:00:00.000Z';
@@ -54,32 +55,31 @@ describe('order deadline badge', () => {
   beforeEach(() => {
     // Fixed at local noon so "today" is unambiguous in every timezone.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 10, 5, 12, 0, 0));
+    vi.setSystemTime(new Date('2026-11-05T12:00:00.000Z'));
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  // covers AC-19: the badge is derived from the promise, not stored
+  // covers AC-9: the badge is derived from the promise, not stored
   it('marks an active order past its promised day as overdue', () => {
     render(<OrderDeadlineBadge deliveryDeadline="2026-11-04" status="PENDING" />);
 
     expect(screen.getByText('Overdue')).toBeVisible();
   });
 
-  // covers AC-19: a promise of today or a future day is not late
+  // covers AC-9: a promise of today or a future day is not late
   it('renders no badge for today or a future day', () => {
-    const { rerender } = render(
-      <OrderDeadlineBadge deliveryDeadline="2026-11-05" status="PENDING" />,
-    );
+    const first = render(<OrderDeadlineBadge deliveryDeadline="2026-11-05" status="PENDING" />);
     expect(screen.queryByText('Overdue')).toBeNull();
+    first.unmount();
 
-    rerender(<OrderDeadlineBadge deliveryDeadline="2026-11-06" status="PENDING" />);
+    render(<OrderDeadlineBadge deliveryDeadline="2026-11-06" status="PENDING" />);
     expect(screen.queryByText('Overdue')).toBeNull();
   });
 
-  // covers AC-19: a finished order keeps its promise but is never late
+  // covers AC-9: a finished order keeps its promise but is never late
   it.each<OrderStatusType>(['DELIVERED', 'CANCELLED', 'RETURNED'])(
     'renders no badge for a past promise on a %s order',
     (status) => {
@@ -89,7 +89,7 @@ describe('order deadline badge', () => {
     },
   );
 
-  // covers AC-19: an order with no promise cannot be late
+  // covers AC-9: an order with no promise cannot be late
   it('renders no badge when no deadline is set', () => {
     render(<OrderDeadlineBadge deliveryDeadline={null} status="PENDING" />);
 
@@ -100,14 +100,14 @@ describe('order deadline badge', () => {
 describe('order deadline cell', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 10, 5, 12, 0, 0));
+    vi.setSystemTime(new Date('2026-11-05T12:00:00.000Z'));
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  // covers AC-14 and AC-19: a list row shows the promised day and flags lateness
+  // covers AC-14 and AC-9: a list row shows the promised day and flags lateness
   it('shows the formatted promise with the overdue badge', () => {
     render(<OrderDeadlineCell row={makeSummary({ deliveryDeadline: '2026-11-04' })} />);
 
@@ -123,7 +123,7 @@ describe('order deadline cell', () => {
     expect(screen.queryByText('Overdue')).toBeNull();
   });
 
-  // covers AC-14 and AC-19: a delivered row keeps its date without a late flag
+  // covers AC-14 and AC-9: a delivered row keeps its date without a late flag
   it('shows the promise on a delivered row without a badge', () => {
     render(
       <OrderDeadlineCell
@@ -139,14 +139,14 @@ describe('order deadline cell', () => {
 describe('order deadline summary', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 10, 5, 12, 0, 0));
+    vi.setSystemTime(new Date('2026-11-05T12:00:00.000Z'));
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  // covers AC-16 and AC-19: the detail header shows the promise and its flag
+  // covers AC-16 and AC-9: the detail header shows the promise and its flag
   it('shows the formatted promise with the overdue badge', () => {
     render(<OrderDeadlineSummary order={makeOrder({ deliveryDeadline: '2026-11-04' })} />);
 

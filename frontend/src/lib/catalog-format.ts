@@ -1,5 +1,6 @@
 import type { ProductStockStatus, OrderStatusType } from '@f-commerce/contracts';
 import { ORDER_ACTIVE_STATUSES } from './order-form';
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from './timezone';
 
 export const STOCK_STATUS_LABEL: Record<ProductStockStatus, string> = {
   inStock: 'In stock',
@@ -13,10 +14,20 @@ export function formatMoney(value: number | null | undefined, currency: string):
   return currency === '' ? amount : `${amount} ${currency}`;
 }
 
-export function formatDateTime(value: string): string {
+export function formatDateTime(value: string, timeZone: string = DEFAULT_TIME_ZONE): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+  const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: zone,
+    }).format(date);
+  } catch {
+    return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  }
 }
 
 /**
@@ -49,26 +60,18 @@ const MONTH_LABELS = [
   'Dec',
 ];
 
-/** The viewer's calendar day as `YYYY-MM-DD`, read from their local clock. */
-export function localToday(now: Date = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 /**
- * True when a promise is set, already past the viewer's local today, and the
+ * True when a promise is set, already before the business's today, and the
  * order is still working. A day that is today is not overdue.
  */
 export function isOverdue(
   deliveryDeadline: string | null | undefined,
   status: OrderStatusType,
-  now: Date = new Date(),
+  today: string,
 ): boolean {
   if (!deliveryDeadline) return false;
   if (!ORDER_ACTIVE_STATUSES.includes(status)) return false;
-  return deliveryDeadline < localToday(now);
+  return deliveryDeadline < today;
 }
 
 export function combinationLabel(combination: Record<string, string>): string {

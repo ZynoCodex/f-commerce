@@ -50,7 +50,7 @@ function statusesForFilter(filter: StatusFilter): OrderStatusType[] | undefined 
 
 export default function OrdersPage() {
   const ready = useRequireAuth();
-  const { currency } = useBusinessSettings();
+  const { currency, timezone } = useBusinessSettings();
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -211,7 +211,7 @@ export default function OrdersPage() {
       key: 'createdAt' as const,
       label: 'Created',
       render: (row: OrderSummaryDto) => (
-        <span className="text-body">{formatDateTime(row.createdAt)}</span>
+        <span className="text-body">{formatDateTime(row.createdAt, timezone)}</span>
       ),
     },
   ];
@@ -395,7 +395,7 @@ export default function OrdersPage() {
                     </div>
                   </div>
                   <p className="text-sm text-muted">
-                    {orderSourceLabel(row.source)} · {formatDateTime(row.createdAt)}
+                    {orderSourceLabel(row.source)} · {formatDateTime(row.createdAt, timezone)}
                   </p>
                 </RecordCard>
               ))}

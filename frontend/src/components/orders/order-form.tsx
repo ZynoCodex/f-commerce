@@ -24,8 +24,10 @@ import {
 } from '@/components/ui/primitives';
 import { CustomerPicker } from '@/components/orders/customer-picker';
 import { ProductPicker } from '@/components/orders/product-picker';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { isTimeoutError } from '@/lib/auth-client';
-import { formatDateTime, formatMoney, localToday } from '@/lib/catalog-format';
+import { formatDateTime, formatMoney } from '@/lib/catalog-format';
+import { todayInTimeZone } from '@/lib/timezone';
 import { OrderApiError, createOrder, updateOrder } from '@/lib/order-client';
 import {
   MAX_LINE_QUANTITY,
@@ -130,6 +132,7 @@ export function OrderForm({
   onCancel,
   onConflict,
 }: OrderFormProps) {
+  const { timezone, mounted } = useBusinessSettings();
   const [customer, setCustomer] = useState<OrderCustomerSelection | null>(() =>
     initialCustomer(order),
   );
@@ -151,10 +154,14 @@ export function OrderForm({
 
   const totals = computeOrderTotals(lines, deliveryFee, discount);
   const discountTooHigh = totals.discount > totals.subtotal + totals.deliveryFee;
+  // The business day is unknown on the server and the hydration render, so the
+  // warning waits for the client clock rather than guessing a day.
+  const today = mounted ? todayInTimeZone(timezone) : null;
   const deadlineInPast =
+    today !== null &&
     deliveryDeadline !== '' &&
     isRealCalendarDate(deliveryDeadline) &&
-    deliveryDeadline < localToday();
+    deliveryDeadline < today;
 
   const fieldError = (field: string): string | undefined =>
     fieldErrors.includes(field) ? FIELD_MESSAGES[field] : undefined;
@@ -724,7 +731,8 @@ export function OrderForm({
                 {duplicate.orderNumber}
               </p>
               <p className="mt-1 text-sm text-body">
-                {formatMoney(duplicate.total, currency)} · {formatDateTime(duplicate.createdAt)}
+                {formatMoney(duplicate.total, currency)} ·{' '}
+                {formatDateTime(duplicate.createdAt, timezone)}
               </p>
             </div>
             <p className="text-sm text-body">
