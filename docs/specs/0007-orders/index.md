@@ -262,7 +262,7 @@ The promised delivery date is a second thin path over the shipped feature:
 
 ## Follow-up
 
-- [ ] Feature 10 must own `paidAmount` and `dueAmount` writes, and must decide how an edit or cancel behaves once a payment exists. It must also extend order creation to capture an optional first payment and its type, and decide how that first payment reaches the create contract, the order totals, and an idempotent replay.
+- [ ] Feature 10 must own `paidAmount` and `dueAmount` writes, and must decide how an edit or cancel behaves once a payment exists. It must also extend order creation to capture an optional first payment and its method from the set in feature 10 of `docs/scope/scope.md`, decide whether cash on delivery can be that first payment, and decide how the first payment reaches the create contract, the order totals, and an idempotent replay.
 - [ ] Feature 11 must reserve and deduct stock, and must decide the response when stock changes under an existing order.
 - [ ] Feature 12 owns courier and tracking fields already present on the order. It should decide whether a delivery event can update or clear the promised deadline, or whether the deadline stays locked after `CONFIRMED`.
 - [ ] Products should gain variant archiving (scope feature 21) so a retired variant keeps its identity and an order line keeps its reference.

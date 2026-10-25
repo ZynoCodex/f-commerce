@@ -180,8 +180,8 @@ Order creation from customer/product selection, status states, order history, so
 
 ### 10. Payments · needs a decision
 
-Payment methods (cash, bKash, Nagad, bank transfer), partial and full payments, due tracking, payment records. Order creation also captures the first payment and its type, so the money taken at the sale is recorded against the order it pays for.
-**Done when:** user can capture a first payment and its type while creating an order, add later payments against the same order, and see the correct paid and due amounts.
+Payment methods (cash, cash on delivery, bKash, Nagad, bank transfer, debit or credit card, PayPal, and other; bKash and Nagad are Bangladesh only), partial and full payments, due tracking, payment records. Order creation also captures the first payment and its method, so the money taken at the sale is recorded against the order it pays for.
+**Done when:** user can capture a first payment and its method while creating an order, add later payments against the same order, and see the correct paid and due amounts.
 
 - [ ] Design it (spec): `/architect payments`
 
