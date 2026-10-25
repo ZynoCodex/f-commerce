@@ -299,7 +299,8 @@ export default function CustomersPage() {
         </section>
 
         {isLoading && rows.length === 0 && (
-          <div className="grid gap-3">
+          <div className="grid gap-3" role="status">
+            <span className="sr-only">Loading customers…</span>
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
@@ -318,21 +319,23 @@ export default function CustomersPage() {
         )}
 
         {!isLoading && !error && rows.length === 0 && (
-          <EmptyState>
-            <div>
-              <Users aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
-              <p className="font-semibold text-ink">
-                {debouncedQuery === ''
-                  ? 'No customers yet'
-                  : `No customers match “${debouncedQuery}”`}
-              </p>
-              <p className="mt-1 text-sm text-body">
-                {debouncedQuery === ''
-                  ? 'Add your first buyer to start tracking their orders.'
-                  : 'Try a shorter name, or search by the phone number.'}
-              </p>
-            </div>
-          </EmptyState>
+          <div role="status">
+            <EmptyState>
+              <div>
+                <Users aria-hidden="true" className="mx-auto mb-3 text-muted" size={28} />
+                <p className="font-semibold text-ink">
+                  {debouncedQuery === ''
+                    ? 'No customers yet'
+                    : `No customers match “${debouncedQuery}”`}
+                </p>
+                <p className="mt-1 text-sm text-body">
+                  {debouncedQuery === ''
+                    ? 'Add your first buyer to start tracking their orders.'
+                    : 'Try a shorter name, or search by the phone number.'}
+                </p>
+              </div>
+            </EmptyState>
+          </div>
         )}
 
         {rows.length > 0 && (
