@@ -2,9 +2,12 @@ import { TenantEntity } from './base.entity.js';
 
 export enum PaymentMethod {
   CASH = 'CASH',
+  CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
   BKASH = 'BKASH',
   NAGAD = 'NAGAD',
   BANK_TRANSFER = 'BANK_TRANSFER',
+  CARD = 'CARD',
+  PAYPAL = 'PAYPAL',
   OTHER = 'OTHER',
 }
 
