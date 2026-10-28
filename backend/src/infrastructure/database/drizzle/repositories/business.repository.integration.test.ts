@@ -132,6 +132,11 @@ describe('DrizzleBusinessRepository', () => {
   });
 
   describe('saveDraft', () => {
+    // A draft only exists before onboarding finishes; the seeded row is complete.
+    beforeEach(async () => {
+      await getDb().update(businesses).set({ onboardingComplete: false });
+    });
+
     it('merges one draft field without clearing the others', async () => {
       await repository.saveDraft(BIZ, 'name', 'Renamed Draft');
 
@@ -152,6 +157,28 @@ describe('DrizzleBusinessRepository', () => {
 
       const result = await repository.findById(BIZ);
       expect(result?.onboardingDraft).toEqual({ currency: 'GBP' });
+    });
+
+    it('does not resurrect a draft once onboarding is complete', async () => {
+      await repository.clearDraft(BIZ);
+      await repository.updateProfile(BIZ, { onboardingComplete: true });
+
+      // Simulates a draft request that was in flight when onboarding finished.
+      await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+
+      const result = await repository.findById(BIZ);
+      expect(result?.onboardingComplete).toBe(true);
+      expect(result?.onboardingDraft).toBeUndefined();
+    });
+
+    it('leaves a completed row untouched even when it still carries a draft', async () => {
+      await getDb().update(businesses).set({ onboardingComplete: true });
+
+      await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+
+      const result = await repository.findById(BIZ);
+      // The seeded draft is unchanged: the completed row never accepts the late write.
+      expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
     });
   });
 

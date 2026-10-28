@@ -421,6 +421,29 @@ describe('Business Controller - PUT /me', () => {
     expect(res.body.data.timezone).toBe('Asia/Dhaka');
   });
 
+  it('stores an IANA alias in the canonical form the runtime reports', async () => {
+    const canonical = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Calcutta',
+    }).resolvedOptions().timeZone;
+
+    updateBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Existing Biz',
+      currency: 'BDT',
+      timezone: canonical,
+      onboardingComplete: true,
+    });
+
+    const res = await request(app)
+      .put('/api/business/me')
+      .set('x-business-id', 'biz-target')
+      .send({ timezone: 'Asia/Calcutta' });
+
+    expect(res.status).toBe(200);
+    expect(updateBusinessMock).toHaveBeenCalledWith('biz-target', { timezone: canonical });
+    expect(res.body.data.timezone).toBe(canonical);
+  });
+
   it('returns 400 for an invalid timezone and writes nothing', async () => {
     const res = await request(app)
       .put('/api/business/me')

@@ -24,6 +24,7 @@ test.describe('customer records', () => {
       data: {
         name: 'Customers E2E Co',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 E2E Street', city: 'Dhaka', country: 'Bangladesh' },
       },
       headers: { Authorization: `Bearer ${accessToken}`, 'x-business-id': businessId },

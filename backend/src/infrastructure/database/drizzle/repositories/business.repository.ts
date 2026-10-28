@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { businesses } from '../schema.js';
 import { isUuid } from '../../../../domain/uuid.js';
@@ -59,7 +59,13 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     return result.length > 0 ? toBusiness(result[0]) : null;
   }
 
-  /** Merge one draft field, preserving every other field already saved. */
+  /**
+   * Merge one draft field, preserving every other field already saved.
+   * A completed business has no draft, so the write is skipped once onboarding
+   * finishes. That closes the race where a draft request is already in flight
+   * when onboarding completes: if it lands after `clearDraft`, the completed
+   * row is left untouched instead of gaining a stale draft.
+   */
   async saveDraft(businessId: string, field: string, value: unknown): Promise<void> {
     if (!isUuid(businessId)) return;
 
@@ -70,7 +76,7 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
         onboardingDraft: sql`coalesce(${businesses.onboardingDraft}, '{}'::jsonb) || ${patch}::jsonb`,
         updatedAt: new Date(),
       })
-      .where(eq(businesses.id, businessId));
+      .where(and(eq(businesses.id, businessId), eq(businesses.onboardingComplete, false)));
   }
 
   async clearDraft(businessId: string): Promise<void> {

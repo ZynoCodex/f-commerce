@@ -38,8 +38,25 @@ const savedDraftCache: Record<DraftField, string> = {
   address: '',
 };
 
-let pendingSave: { field: DraftField; value: unknown } | null = null;
+// Keep one pending value per field: timezone and currency sit on the same step,
+// so a second change inside the debounce window must not drop the first draft.
+const pendingSaves = new Map<DraftField, unknown>();
 let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelDraftSave() {
+  if (draftDebounceTimer) {
+    clearTimeout(draftDebounceTimer);
+    draftDebounceTimer = null;
+  }
+  pendingSaves.clear();
+}
+
+function resetDraftState() {
+  cancelDraftSave();
+  savedDraftCache.currency = '';
+  savedDraftCache.timezone = '';
+  savedDraftCache.address = '';
+}
 
 function scheduleDraftSave(field: DraftField, value: unknown) {
   const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -48,29 +65,34 @@ function scheduleDraftSave(field: DraftField, value: unknown) {
   if (savedDraftCache[field] === serialized) return;
   savedDraftCache[field] = serialized;
 
-  // Store the most recent pending save
-  pendingSave = { field, value };
+  // Keep every field changed inside the window, so the next timer flush sends them all.
+  pendingSaves.set(field, value);
 
   // Reset debounce timer
   if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
 
   draftDebounceTimer = setTimeout(async () => {
-    if (!pendingSave) return;
+    draftDebounceTimer = null;
+    const batch = [...pendingSaves.entries()];
+    pendingSaves.clear();
 
-    try {
-      await apiFetch('/api/business/onboarding/draft', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          field: pendingSave.field,
-          value: pendingSave.value,
-        }),
-      });
-    } catch {
-      // Silently fail - draft is for convenience, not critical
-    }
-
-    pendingSave = null;
+    // One request per field, isolated so one failure cannot drop the others.
+    await Promise.all(
+      batch.map(async ([pendingField, pendingValue]) => {
+        try {
+          await apiFetch('/api/business/onboarding/draft', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              field: pendingField,
+              value: pendingValue,
+            }),
+          });
+        } catch {
+          // Silently fail - draft is for convenience, not critical
+        }
+      }),
+    );
   }, 500); // 500ms debounce
 }
 
@@ -86,7 +108,7 @@ type BusinessData = {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { updateSettings } = useBusinessSettings();
+  const { businessId, updateSettings } = useBusinessSettings();
 
   // Gate the whole flow behind authentication before any API call.
   // All hooks below are called unconditionally so hook order is stable
@@ -117,6 +139,9 @@ export default function OnboardingPage() {
   useEffect(() => {
     let cancelled = false;
     void cancelled;
+
+    // Drop any draft state from a previous business or mount.
+    resetDraftState();
 
     apiFetch('/api/business/me', {
       method: 'GET',
@@ -189,12 +214,8 @@ export default function OnboardingPage() {
 
     return () => {
       cancelled = true;
-      // Clear pending draft save on unmount
-      if (draftDebounceTimer) {
-        clearTimeout(draftDebounceTimer);
-        draftDebounceTimer = null;
-      }
-      pendingSave = null;
+      // Drop the pending save and the cache on unmount.
+      resetDraftState();
     };
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -247,6 +268,10 @@ export default function OnboardingPage() {
       return;
     }
 
+    // Stop a pending draft write from landing after completion clears the draft.
+    cancelDraftSave();
+    // Capture the owner before the request so a switch in flight drops the save.
+    const targetBusinessId = businessId;
     setSubmitting(true);
     setError(null);
 
@@ -270,10 +295,18 @@ export default function OnboardingPage() {
 
       const data = await res.json();
       const saved = data.data as { currency?: unknown; timezone?: unknown };
-      if (typeof saved.currency === 'string' && typeof saved.timezone === 'string') {
-        updateSettings({ currency: saved.currency, timezone: saved.timezone });
-      }
+      const savedTimeZone = TimezoneSchema.safeParse(saved.timezone);
+      // Both fields go to the provider, which validates each one. If the
+      // response omits the zone, keep the zone this request just saved.
+      updateSettings(
+        {
+          currency: saved.currency,
+          timezone: savedTimeZone.success ? savedTimeZone.data : parsedTimeZone.data,
+        },
+        targetBusinessId,
+      );
 
+      resetDraftState();
       router.replace('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

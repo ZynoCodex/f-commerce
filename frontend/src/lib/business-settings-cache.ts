@@ -7,8 +7,39 @@ export interface CachedBusinessSettings {
 
 const CACHE_PREFIX = 'f-commerce:business-settings:v1:';
 
+/**
+ * The last parsed entry. The provider reads this on every render, so an
+ * unchanged raw value must not be parsed or validated again. The raw string is
+ * part of the key, so a write in this tab or another one still invalidates it.
+ */
+let lastRead: { key: string; value: CachedBusinessSettings | null } | null = null;
+
 export function businessSettingsCacheKey(businessId: string): string {
   return `${CACHE_PREFIX}${businessId}`;
+}
+
+function parseBusinessSettingsCache(
+  businessId: string,
+  raw: string | null,
+): CachedBusinessSettings | null {
+  if (!raw) return null;
+
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object') {
+    removeBusinessSettingsCache(businessId);
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const currency = CurrencyEnum.safeParse(record.currency);
+  const timezone = TimezoneSchema.safeParse(record.timezone);
+
+  if (!currency.success || !timezone.success) {
+    removeBusinessSettingsCache(businessId);
+    return null;
+  }
+
+  return { currency: currency.data, timezone: timezone.data };
 }
 
 /** Read and validate one business's cached settings. A bad entry is removed. */
@@ -17,26 +48,15 @@ export function readBusinessSettingsCache(businessId: string): CachedBusinessSet
 
   try {
     const raw = window.localStorage.getItem(businessSettingsCacheKey(businessId));
-    if (!raw) return null;
+    const key = `${businessId}|${raw ?? ''}`;
+    if (lastRead?.key === key) return lastRead.value;
 
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      removeBusinessSettingsCache(businessId);
-      return null;
-    }
-
-    const record = parsed as Record<string, unknown>;
-    const currency = CurrencyEnum.safeParse(record.currency);
-    const timezone = TimezoneSchema.safeParse(record.timezone);
-
-    if (!currency.success || !timezone.success) {
-      removeBusinessSettingsCache(businessId);
-      return null;
-    }
-
-    return { currency: currency.data, timezone: timezone.data };
+    const value = parseBusinessSettingsCache(businessId, raw);
+    lastRead = { key, value };
+    return value;
   } catch {
     removeBusinessSettingsCache(businessId);
+    lastRead = null;
     return null;
   }
 }
@@ -46,6 +66,7 @@ export function writeBusinessSettingsCache(
   businessId: string,
   settings: CachedBusinessSettings,
 ): void {
+  lastRead = null;
   if (typeof window === 'undefined') return;
 
   try {
@@ -59,6 +80,7 @@ export function writeBusinessSettingsCache(
 }
 
 export function removeBusinessSettingsCache(businessId: string): void {
+  lastRead = null;
   if (typeof window === 'undefined') return;
 
   try {

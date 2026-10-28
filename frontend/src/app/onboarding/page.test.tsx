@@ -1,10 +1,12 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { render } from '@/test-utils/render';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeBoundary } from '@/components/theme/theme';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { setAuth } from '@/lib/auth-client';
+import { businessSettingsCacheKey } from '@/lib/business-settings-cache';
 
 const replaceMock = vi.fn();
 // a stable router object, so the page's [router]-dependent effect does not re-run on every render
@@ -32,6 +34,12 @@ const incompleteBusiness = {
   onboardingComplete: false,
 };
 
+/** Reads the shared provider so a test can see what the shell badge would show. */
+function SettingsProbe() {
+  const { currency, timezone } = useBusinessSettings();
+  return <p data-testid="settings">{`${currency}|${timezone}`}</p>;
+}
+
 // jsdom does not implement URL.createObjectURL, used for the logo preview
 function setupObjectUrl() {
   if (typeof URL.createObjectURL !== 'function') {
@@ -42,6 +50,22 @@ function setupObjectUrl() {
   }
 }
 
+// `browserTimeZone` asks the runtime for the browser zone with no arguments.
+// Keep the real constructor for every call that passes a locale or options, so
+// schema validation still uses the runtime's own timezone data.
+function stubBrowserTimeZone(zone: string) {
+  const RealDateTimeFormat = Intl.DateTimeFormat;
+  vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+    locale?: string | string[],
+    options?: Intl.DateTimeFormatOptions,
+  ) {
+    if (locale === undefined && options === undefined) {
+      return { resolvedOptions: () => ({ timeZone: zone }) } as Intl.DateTimeFormat;
+    }
+    return new RealDateTimeFormat(locale, options);
+  } as typeof Intl.DateTimeFormat);
+}
+
 describe('OnboardingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,6 +74,11 @@ describe('OnboardingPage', () => {
     // the wizard-based tests render past the guard.
     setAuth({ accessToken: 'tok', businessId: 'biz-1' });
     setupObjectUrl();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('shows a loading state before the business profile resolves', () => {
@@ -194,7 +223,29 @@ describe('OnboardingPage', () => {
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
   });
 
+  it('covers AC-5: prefills the browser timezone when there is no draft', async () => {
+    stubBrowserTimeZone('Europe/Berlin');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: incompleteBusiness })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
+  });
+
   it('covers AC-5: ignores an invalid draft timezone and keeps the browser prefill', async () => {
+    stubBrowserTimeZone('Europe/Berlin');
     const withDraft = {
       ...incompleteBusiness,
       onboardingDraft: {
@@ -221,9 +272,7 @@ describe('OnboardingPage', () => {
     await user.click(screen.getByRole('button', { name: /get started/i }));
     await user.click(screen.getByRole('button', { name: /^continue$/i }));
 
-    const select = screen.getByLabelText(/timezone/i) as HTMLSelectElement;
-    expect(select.value).not.toBe('Mars/Olympus');
-    expect(Array.from(select.options).map((option) => option.value)).toContain(select.value);
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
   });
 
   it('covers AC-5: saves a changed timezone as a draft', async () => {
@@ -264,6 +313,98 @@ describe('OnboardingPage', () => {
     const draftBody = JSON.parse(String(draftCall![1]!.body));
     expect(draftBody.field).toBe('timezone');
     expect(draftBody.value).toBe('Europe/London');
+  });
+
+  it('covers AC-5: keeps the timezone draft when currency changes inside the debounce window', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding/draft' && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(200, { success: true, message: 'Draft saved' }));
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    // Fake only the draft debounce. fireEvent keeps both changes synchronous,
+    // so timezone and currency land inside the same 500ms window.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    fireEvent.change(screen.getByLabelText(/timezone/i), {
+      target: { value: 'Europe/Berlin' },
+    });
+    fireEvent.change(screen.getByLabelText(/currency/i), {
+      target: { value: 'EUR' },
+    });
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    const draftBodies = fetchMock.mock.calls
+      .filter((call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT')
+      .map((call) => JSON.parse(String(call[1]!.body)));
+
+    expect(draftBodies).toHaveLength(2);
+    expect(draftBodies).toEqual(
+      expect.arrayContaining([
+        { field: 'timezone', value: 'Europe/Berlin' },
+        { field: 'currency', value: 'EUR' },
+      ]),
+    );
+  });
+
+  it('covers AC-5: lets a later business save the same draft timezone after unmount', async () => {
+    stubBrowserTimeZone('Asia/Dhaka');
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding/draft' && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(200, { success: true, message: 'Draft saved' }));
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const draftCalls = () =>
+      fetchMock.mock.calls.filter(
+        (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
+      );
+    const user = userEvent.setup();
+
+    const first = render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/London');
+
+    await waitFor(() => expect(draftCalls()).toHaveLength(1), { timeout: 2000 });
+
+    // Sign out and sign in as a fresh business in the same tab.
+    first.unmount();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/London');
+
+    // The second business has no draft, so the shared cache must not skip this save.
+    await waitFor(() => expect(draftCalls()).toHaveLength(2), { timeout: 2000 });
+    expect(JSON.parse(String(draftCalls()[1]![1]!.body)).value).toBe('Europe/London');
   });
 
   it('covers AC-5: shows the timezone on review and sends it with completion', async () => {
@@ -315,6 +456,259 @@ describe('OnboardingPage', () => {
       (call) => call[0] === '/api/business/onboarding' && call[1]?.method === 'PUT',
     );
     expect(JSON.parse(String(onboardingCall![1]!.body)).timezone).toBe('Europe/Berlin');
+  });
+
+  it('covers AC-5: updates the shared settings from the completion response', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Europe/London',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        // The response carries a zone the form never held, so the assertion
+        // proves the page reads the response body instead of its own state.
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              name: 'Maya Traders',
+              currency: 'USD',
+              timezone: 'America/New_York',
+              onboardingComplete: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: withDraft }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    // The provider paints the stored profile before the wizard finishes.
+    await waitFor(() => expect(screen.getByTestId('settings')).toHaveTextContent('BDT|Asia/Dhaka'));
+
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /enter order desk/i }));
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
+    // The completion response, not the draft zone, is what the badge now shows.
+    expect(screen.getByTestId('settings')).toHaveTextContent('USD|America/New_York');
+  });
+
+  it('covers AC-5: applies the completion timezone when the response omits currency', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Europe/London',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        // JSON.stringify drops the undefined currency, so only the timezone
+        // is present in the completion response.
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              name: 'Maya Traders',
+              currency: undefined,
+              timezone: 'America/New_York',
+              onboardingComplete: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: withDraft }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await waitFor(() => expect(screen.getByTestId('settings')).toHaveTextContent('BDT|Asia/Dhaka'));
+
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /enter order desk/i }));
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
+    // The missing currency keeps the stored value; the valid timezone lands.
+    expect(screen.getByTestId('settings')).toHaveTextContent('BDT|America/New_York');
+    expect(window.localStorage.getItem(businessSettingsCacheKey('biz-1'))).toBe(
+      JSON.stringify({ currency: 'BDT', timezone: 'America/New_York' }),
+    );
+  });
+
+  it('covers AC-5: blocks step three with an inline error for an invalid timezone', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding/draft' && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(200, { success: true, message: 'Draft saved' }));
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    expect(screen.getByText('Step 3 of 4')).toBeVisible();
+
+    // The select never offers an empty option, but a corrupted form value must
+    // still block the wizard with the message the spec requires.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    fireEvent.change(screen.getByLabelText(/timezone/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    expect(screen.getByText(/choose a valid timezone/i)).toBeVisible();
+    expect(screen.getByText('Step 3 of 4')).toBeVisible();
+
+    // Flush the debounced draft write so it cannot leak into the next test.
+    await vi.advanceTimersByTimeAsync(600);
+  });
+
+  it('covers AC-7: drops the completion settings when the business changes in flight', async () => {
+    let resolveCompletion: (value: Response) => void = () => {};
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        return new Promise<Response>((resolve) => {
+          resolveCompletion = resolve;
+        });
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+    await user.click(screen.getByRole('button', { name: /enter order desk/i }));
+
+    // The save belongs to biz-1, but the tab signs in as biz-2 before it lands.
+    act(() => setAuth({ accessToken: 'tok-2', businessId: 'biz-2' }));
+    await waitFor(() => expect(screen.getByTestId('settings')).toHaveTextContent('BDT|Asia/Dhaka'));
+
+    await act(async () => {
+      resolveCompletion(
+        jsonResponse(200, {
+          success: true,
+          data: {
+            ...incompleteBusiness,
+            currency: 'EUR',
+            timezone: 'Europe/Berlin',
+            onboardingComplete: true,
+          },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The response belongs to biz-1, so biz-2 keeps its own settings and cache.
+    expect(screen.getByTestId('settings')).toHaveTextContent('BDT|Asia/Dhaka');
+    expect(window.localStorage.getItem(businessSettingsCacheKey('biz-2'))).toBe(
+      JSON.stringify({ currency: 'BDT', timezone: 'Asia/Dhaka' }),
+    );
+  });
+
+  it('covers AC-5: cancels a pending draft save when onboarding completes', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        name: 'Draft Biz',
+        currency: 'USD',
+        timezone: 'Europe/Berlin',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/onboarding' && init?.method === 'PUT') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            success: true,
+            data: {
+              name: 'Maya Traders',
+              currency: 'USD',
+              timezone: 'Europe/London',
+              onboardingComplete: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: withDraft }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const realUser = userEvent.setup();
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await realUser.click(screen.getByRole('button', { name: /get started/i }));
+    await realUser.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    // Fake only the draft debounce. fireEvent keeps the interaction synchronous,
+    // so userEvent's internal waits cannot stall on the fake clock.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    fireEvent.change(screen.getByLabelText(/timezone/i), {
+      target: { value: 'Europe/London' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enter order desk/i }));
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(replaceMock).toHaveBeenCalledWith('/dashboard');
+
+    await vi.advanceTimersByTimeAsync(600);
+    const draftCalls = fetchMock.mock.calls.filter(
+      (call) => call[0] === '/api/business/onboarding/draft' && call[1]?.method === 'PUT',
+    );
+    expect(draftCalls).toHaveLength(0);
   });
 
   it('pre-fills business name from onboarding endpoint when business/me returns 403', async () => {

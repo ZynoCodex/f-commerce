@@ -1,6 +1,6 @@
 import type { ProductStockStatus, OrderStatusType } from '@f-commerce/contracts';
 import { ORDER_ACTIVE_STATUSES } from './order-form';
-import { DEFAULT_TIME_ZONE, isValidTimeZone } from './timezone';
+import { DEFAULT_TIME_ZONE, getDateTimeFormatter, normalizeTimeZone } from './timezone';
 
 export const STOCK_STATUS_LABEL: Record<ProductStockStatus, string> = {
   inStock: 'In stock',
@@ -18,15 +18,19 @@ export function formatDateTime(value: string, timeZone: string = DEFAULT_TIME_ZO
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIME_ZONE;
+  const zone = normalizeTimeZone(timeZone);
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    return getDateTimeFormatter(`dateTime|${zone}`, 'en-US', {
       dateStyle: 'medium',
       timeStyle: 'short',
       timeZone: zone,
     }).format(date);
   } catch {
-    return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    return date.toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: DEFAULT_TIME_ZONE,
+    });
   }
 }
 

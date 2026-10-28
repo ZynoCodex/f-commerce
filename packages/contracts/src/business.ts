@@ -3,18 +3,6 @@ import { z } from 'zod';
 export const CurrencyEnum = z.enum(['BDT', 'USD', 'EUR', 'GBP']);
 
 /**
- * Resolve a value through the runtime's own IANA timezone data. Returns the
- * canonical ID, or null when the runtime does not recognize the value.
- */
-function resolveTimeZone(value: string): string | null {
-  try {
-    return new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * A bare `UTC` or an `Area/Location` style IANA ID. This rejects fixed offsets
  * such as `+06:00` and abbreviations such as `BST`, both of which the runtime
  * would otherwise accept as legacy aliases.
@@ -26,17 +14,44 @@ function isIanaTimeZoneId(value: string): boolean {
 }
 
 /**
+ * Resolve a value through the runtime's own IANA timezone data. Trims the
+ * input, checks the accepted shape, and returns the canonical ID, or null when
+ * the runtime does not recognize the value. A caller that only needs the
+ * boolean check can compare the result with null.
+ */
+export function resolveTimeZone(value: string): string | null {
+  const zone = value.trim();
+  if (zone.length === 0 || zone.length > 64) return null;
+  if (!isIanaTimeZoneId(zone)) return null;
+
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * An IANA timezone ID accepted by the runtime, stored in canonical form.
  * Fixed offsets and abbreviations are rejected because they do not survive
- * daylight saving changes.
+ * daylight saving changes. The runtime formatter is constructed once per
+ * parse: the cheap checks give the specific errors, and the transform does
+ * the single resolution.
  */
 export const TimezoneSchema = z
   .string()
   .trim()
   .min(1, 'Timezone is required')
   .max(64, 'Timezone must be 64 characters or fewer')
-  .refine((value) => isIanaTimeZoneId(value) && resolveTimeZone(value) !== null, 'Invalid timezone')
-  .transform((value) => resolveTimeZone(value) ?? value);
+  .refine(isIanaTimeZoneId, 'Invalid timezone')
+  .transform((value, ctx) => {
+    const resolved = resolveTimeZone(value);
+    if (resolved === null) {
+      ctx.addIssue({ code: 'custom', message: 'Invalid timezone' });
+      return z.NEVER;
+    }
+    return resolved;
+  });
 
 export const AddressSchema = z.object({
   street: z.string().min(1, 'Street is required'),

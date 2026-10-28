@@ -140,7 +140,7 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
 - [x] Review it (fresh model): `/check review customers` — See [2026-10-16-feat-customers.md](../reviews/2026-10-16-feat-customers.md)
 - [x] Document it: `/document customers` — See [2026-10-16-feat-customers.md](../PRs/2026-10-16-feat-customers.md)
 
-### 22. Business timezone · in-progress
+### 22. Business timezone · in-progress (verified)
 
 Every business stores one IANA timezone and the console uses it for delivery deadline checks, timestamps, and future server day boundaries. Onboarding asks for the zone, settings can change it with a confirmation, and existing businesses start on `Asia/Dhaka`.
 
@@ -148,15 +148,15 @@ Every business stores one IANA timezone and the console uses it for delivery dea
 
 - [x] Design it (spec): `/architect business timezone`
       Spec [0008](../specs/0008-business-timezone/index.md)
-- [ ] Build it: `/develop business timezone`
+- [x] Build it: `/develop business timezone`
   - [x] Data, contracts, and profile API: the column, entity, draft type, schema, migration, repository, and read and write endpoints (AC-1, AC-2, AC-3, AC-4)
   - [x] Shared provider, cache, auth change signal, shell badge, header date, and currency call replacement (AC-7, AC-11)
   - [x] Onboarding and settings fields, grouped select, prefill, draft, confirmation dialog, and provider update (AC-5, AC-6, AC-12)
   - [x] Timestamp formatters, deadline warning, Overdue badge, backend day helper, and tests (AC-8, AC-9, AC-10)
-  - [ ] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
-- [ ] Verify it: `/check verify business timezone`
-- [ ] Test it: `/test business timezone`
-- [ ] Review it (fresh model): `/check review business timezone`
+  - [x] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
+- [x] Verify it: `/check verify business timezone` — all 12 acceptance criteria met; API, onboarding, settings, two zone, midnight, corrupt data, cache, and backend down checks pass; tests, lint, typecheck, format, and build clean. See [verify.md](../specs/0008-business-timezone/verify.md).
+- [x] Test it: `/test business timezone` — 381 backend, 258 frontend and 106 contract tests pass; added shell day and mobile menu, customer detail timestamps, auth subscription, business day warning, draft race guard, validated settings write, dialog focus trap, token refetch, storage failure, daylight saving, next render after midnight, and in flight business switch coverage; lint, typecheck and format clean. E2E specs pass on desktop and mobile: 32 passed.
+- [x] Review it (fresh model): `/check review business timezone` — See [2026-10-26-feat-business-timezone.md](../reviews/2026-10-26-feat-business-timezone.md), approve with three minors and four nits, reviewed on GLM-5.3-Flash-Free; the mobile shell badge, the stale draft guard, and the validated settings write all hold.
 - [ ] Document it: `/document business timezone`
 
 ## Slice 2: Product & Order Workflow

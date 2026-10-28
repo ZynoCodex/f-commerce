@@ -8,8 +8,20 @@ describe('isValidTimeZone', () => {
     expect(isValidTimeZone('UTC')).toBe(true);
   });
 
-  it('rejects blank, offset, abbreviation, unknown, and non-string values', () => {
-    for (const value of ['', '  ', '+06:00', 'BST', 'Mars/Olympus', null, undefined, 42]) {
+  it('rejects blank, offset, bare name, abbreviation, unknown, and non-string values', () => {
+    for (const value of [
+      '',
+      '  ',
+      '+06:00',
+      'Japan',
+      'GMT',
+      'CET',
+      'BST',
+      'Mars/Olympus',
+      null,
+      undefined,
+      42,
+    ]) {
       expect(isValidTimeZone(value)).toBe(false);
     }
   });

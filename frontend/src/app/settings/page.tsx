@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Button, Dialog, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
+import { AppShell } from '@/components/shell/shell';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import { useBusinessSettings } from '@/components/business/business-settings-provider';
@@ -31,7 +32,7 @@ export default function SettingsPage() {
   // Gate behind authentication. All hooks below are called unconditionally
   // so hook order is stable across the ready/not-ready renders.
   const ready = useRequireAuth();
-  const { updateSettings } = useBusinessSettings();
+  const { businessId, updateSettings } = useBusinessSettings();
   const [business, setBusiness] = useState<BusinessData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -107,9 +108,17 @@ export default function SettingsPage() {
     };
   }, []);
 
-  if (!ready) return <div className="p-8">Loading...</div>;
+  if (!ready) {
+    return (
+      <AppShell>
+        <div className="p-8">Loading...</div>
+      </AppShell>
+    );
+  }
 
   const submitProfile = async (timeZone: string) => {
+    // Capture the owner before the request so a switch in flight drops the save.
+    const targetBusinessId = businessId;
     setIsSaving(true);
     setError(null);
     setSuccess(null);
@@ -131,15 +140,17 @@ export default function SettingsPage() {
       const savedTimeZone = TimezoneSchema.safeParse(saved.timezone);
       const nextTimeZone = savedTimeZone.success ? savedTimeZone.data : timeZone;
 
-      if (typeof saved.currency === 'string') {
-        updateSettings({ currency: saved.currency, timezone: nextTimeZone });
-      }
+      // The response is untrusted; the provider keeps the last valid value
+      // for each field, so the timezone still lands when currency is missing.
+      updateSettings({ currency: saved.currency, timezone: nextTimeZone }, targetBusinessId);
 
       setBaselineTimeZone(nextTimeZone);
       setForm((prev) => ({ ...prev, timezone: nextTimeZone }));
       setPendingTimeZone(null);
       setSuccess('Profile updated');
     } catch (err) {
+      // Close the confirmation so the page error is visible and announced.
+      setPendingTimeZone(null);
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsSaving(false);
@@ -162,169 +173,179 @@ export default function SettingsPage() {
   };
 
   const cancelTimeZoneChange = () => {
+    // A confirmed save is already in flight. Keep the chosen value visible
+    // until it resolves, so a failure can still satisfy AC-6.
+    if (isSaving) return;
     setPendingTimeZone(null);
     setForm((prev) => ({ ...prev, timezone: baselineTimeZone }));
   };
 
   if (isLoading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <AppShell>
+        <div className="p-8">Loading...</div>
+      </AppShell>
+    );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Business profile</h1>
-        <p className="mt-1 text-sm text-body">
-          Your business information, billing address, and currency.
-        </p>
-      </div>
-
-      {business?.logoUrl && (
-        <div className="flex items-center gap-4">
-          <Image
-            alt="Business logo"
-            className="h-12 w-12 rounded object-contain"
-            height={48}
-            src={business.logoUrl}
-            unoptimized
-            width={48}
-          />
-          <span className="text-sm text-muted">Logo is set via the onboarding wizard</span>
+    <AppShell>
+      <div className="max-w-2xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">Business profile</h1>
+          <p className="mt-1 text-sm text-body">
+            Your business information, billing address, and currency.
+          </p>
         </div>
-      )}
 
-      {error && <FormMessage id="settings-error">{error}</FormMessage>}
-      {success && (
-        <p className="text-sm text-success" role="status">
-          {success}
-        </p>
-      )}
+        {business?.logoUrl && (
+          <div className="flex items-center gap-4">
+            <Image
+              alt="Business logo"
+              className="h-12 w-12 rounded object-contain"
+              height={48}
+              src={business.logoUrl}
+              unoptimized
+              width={48}
+            />
+            <span className="text-sm text-muted">Logo is set via the onboarding wizard</span>
+          </div>
+        )}
 
-      <div className="space-y-6">
-        <Field label="Business name" htmlFor="business-name">
-          <Input
-            id="business-name"
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Maya Traders"
-          />
-        </Field>
+        {error && <FormMessage id="settings-error">{error}</FormMessage>}
+        {success && (
+          <p className="text-sm text-success" role="status">
+            {success}
+          </p>
+        )}
 
-        <Field label="Currency" htmlFor="currency">
-          <Select
-            id="currency"
-            value={form.currency}
-            onChange={(e) =>
-              setForm({ ...form, currency: e.target.value as BusinessProfile['currency'] })
-            }
+        <div className="space-y-6">
+          <Field label="Business name" htmlFor="business-name">
+            <Input
+              id="business-name"
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Maya Traders"
+            />
+          </Field>
+
+          <Field label="Currency" htmlFor="currency">
+            <Select
+              id="currency"
+              value={form.currency}
+              onChange={(e) =>
+                setForm({ ...form, currency: e.target.value as BusinessProfile['currency'] })
+              }
+            >
+              <option value="BDT">BDT - Bangladeshi Taka</option>
+              <option value="USD">USD - US Dollar</option>
+              <option value="EUR">EUR - Euro</option>
+              <option value="GBP">GBP - British Pound</option>
+            </Select>
+          </Field>
+
+          <Field
+            label="Timezone"
+            htmlFor="timezone"
+            description="Used for delivery dates and timestamps."
           >
-            <option value="BDT">BDT - Bangladeshi Taka</option>
-            <option value="USD">USD - US Dollar</option>
-            <option value="EUR">EUR - Euro</option>
-            <option value="GBP">GBP - British Pound</option>
-          </Select>
-        </Field>
+            <TimezoneSelect
+              disabled={isSaving}
+              id="timezone"
+              value={form.timezone}
+              onChange={(timezone) => setForm({ ...form, timezone })}
+            />
+          </Field>
 
-        <Field
-          label="Timezone"
-          htmlFor="timezone"
-          description="Used for delivery dates and timestamps."
+          <Field label="Street" htmlFor="street">
+            <Input
+              id="street"
+              type="text"
+              value={form.address.street}
+              onChange={(e) =>
+                setForm({ ...form, address: { ...form.address, street: e.target.value } })
+              }
+              placeholder="123 Main Street"
+            />
+          </Field>
+
+          <Field label="City" htmlFor="city">
+            <Input
+              id="city"
+              type="text"
+              value={form.address.city}
+              onChange={(e) =>
+                setForm({ ...form, address: { ...form.address, city: e.target.value } })
+              }
+              placeholder="Dhaka"
+            />
+          </Field>
+
+          <Field label="Region / State" htmlFor="region" description="Optional">
+            <Input
+              id="region"
+              type="text"
+              value={form.address.region || ''}
+              onChange={(e) =>
+                setForm({ ...form, address: { ...form.address, region: e.target.value } })
+              }
+              placeholder="Dhaka Division"
+            />
+          </Field>
+
+          <Field label="Postal code" htmlFor="postal-code" description="Optional">
+            <Input
+              id="postal-code"
+              type="text"
+              value={form.address.postalCode || ''}
+              onChange={(e) =>
+                setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
+              }
+              placeholder="1000"
+            />
+          </Field>
+
+          <Field label="Country" htmlFor="country">
+            <Input
+              id="country"
+              type="text"
+              value={form.address.country}
+              onChange={(e) =>
+                setForm({ ...form, address: { ...form.address, country: e.target.value } })
+              }
+            />
+          </Field>
+
+          <Button onClick={saveProfile} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save changes'}
+          </Button>
+        </div>
+
+        <Dialog
+          open={pendingTimeZone !== null}
+          onClose={cancelTimeZoneChange}
+          title="Change the business timezone?"
+          description={pendingTimeZone ? `New timezone: ${pendingTimeZone}` : undefined}
         >
-          <TimezoneSelect
-            id="timezone"
-            value={form.timezone}
-            onChange={(timezone) => setForm({ ...form, timezone })}
-          />
-        </Field>
-
-        <Field label="Street" htmlFor="street">
-          <Input
-            id="street"
-            type="text"
-            value={form.address.street}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, street: e.target.value } })
-            }
-            placeholder="123 Main Street"
-          />
-        </Field>
-
-        <Field label="City" htmlFor="city">
-          <Input
-            id="city"
-            type="text"
-            value={form.address.city}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, city: e.target.value } })
-            }
-            placeholder="Dhaka"
-          />
-        </Field>
-
-        <Field label="Region / State" htmlFor="region" description="Optional">
-          <Input
-            id="region"
-            type="text"
-            value={form.address.region || ''}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, region: e.target.value } })
-            }
-            placeholder="Dhaka Division"
-          />
-        </Field>
-
-        <Field label="Postal code" htmlFor="postal-code" description="Optional">
-          <Input
-            id="postal-code"
-            type="text"
-            value={form.address.postalCode || ''}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
-            }
-            placeholder="1000"
-          />
-        </Field>
-
-        <Field label="Country" htmlFor="country">
-          <Input
-            id="country"
-            type="text"
-            value={form.address.country}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, country: e.target.value } })
-            }
-          />
-        </Field>
-
-        <Button onClick={saveProfile} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save changes'}
-        </Button>
+          <p className="text-sm text-body">
+            Existing order dates do not change, but which orders show as overdue may change.
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button variant="secondary" onClick={cancelTimeZoneChange} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (pendingTimeZone) void submitProfile(pendingTimeZone);
+              }}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Change timezone'}
+            </Button>
+          </div>
+        </Dialog>
       </div>
-
-      <Dialog
-        open={pendingTimeZone !== null}
-        onClose={cancelTimeZoneChange}
-        title="Change the business timezone?"
-        description={pendingTimeZone ? `New timezone: ${pendingTimeZone}` : undefined}
-      >
-        <p className="text-sm text-body">
-          Existing order dates do not change, but which orders show as overdue may change.
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={cancelTimeZoneChange} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              if (pendingTimeZone) void submitProfile(pendingTimeZone);
-            }}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Change timezone'}
-          </Button>
-        </div>
-      </Dialog>
-    </div>
+    </AppShell>
   );
 }

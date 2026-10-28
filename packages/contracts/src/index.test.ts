@@ -1,11 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   healthResponseSchema,
   BusinessProfileUpdateSchema,
   DraftSaveSchema,
   BusinessProfileSchema,
   TimezoneSchema,
+  resolveTimeZone,
 } from './index.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('contracts scaffold', () => {
   it('parses the health response', () => {
@@ -124,6 +129,21 @@ describe('DraftSaveSchema', () => {
   });
 });
 
+describe('resolveTimeZone', () => {
+  it('returns the canonical ID, or null when the runtime rejects the value', () => {
+    expect(resolveTimeZone(' asia/dhaka ')).toBe('Asia/Dhaka');
+    expect(resolveTimeZone('UTC')).toBe('UTC');
+    expect(resolveTimeZone('BST')).toBeNull();
+    expect(resolveTimeZone('Mars/Olympus')).toBeNull();
+  });
+
+  it('rejects blank, fixed offset, bare name, and over long values before resolving', () => {
+    for (const value of ['', '   ', '+06:00', 'Japan', 'GMT', 'CET', 'A'.repeat(65)]) {
+      expect(resolveTimeZone(value)).toBeNull();
+    }
+  });
+});
+
 describe('TimezoneSchema', () => {
   it('accepts a recognized IANA timezone and trims surrounding whitespace', () => {
     expect(TimezoneSchema.parse(' Asia/Dhaka ')).toBe('Asia/Dhaka');
@@ -140,8 +160,42 @@ describe('TimezoneSchema', () => {
     );
   });
 
-  it('rejects blank, whitespace only, fixed offsets, abbreviations, unknown zones, and long values', () => {
-    for (const value of ['', '   ', '+06:00', 'BST', 'Mars/Olympus', 'A'.repeat(65)]) {
+  it('stores an IANA alias in the canonical form the runtime reports', () => {
+    // ICU data decides whether Calcutta or Kolkata is the preferred ID, so
+    // follow the runtime for the alias instead of forcing a specific collapse.
+    const canonical = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Calcutta',
+    }).resolvedOptions().timeZone;
+
+    expect(TimezoneSchema.parse('Asia/Calcutta')).toBe(canonical);
+  });
+
+  it('constructs the runtime formatter once per parse', () => {
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+      locale?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ) {
+      return new RealDateTimeFormat(locale, options);
+    } as typeof Intl.DateTimeFormat);
+
+    TimezoneSchema.parse('Asia/Kolkata');
+
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects blank, whitespace only, fixed offsets, bare names, abbreviations, unknown zones, and long values', () => {
+    for (const value of [
+      '',
+      '   ',
+      '+06:00',
+      'Japan',
+      'GMT',
+      'CET',
+      'BST',
+      'Mars/Olympus',
+      'A'.repeat(65),
+    ]) {
       expect(TimezoneSchema.safeParse(value).success).toBe(false);
     }
   });

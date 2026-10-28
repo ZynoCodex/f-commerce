@@ -1,10 +1,12 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '@/test-utils/render';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeBoundary } from '@/components/theme/theme';
-import { clearAuth, setAuth } from '@/lib/auth-client';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { clearAuth, getAuth, setAuth } from '@/lib/auth-client';
+import { businessSettingsCacheKey } from '@/lib/business-settings-cache';
 
 const replaceMock = vi.fn();
 const stableRouter = { replace: replaceMock };
@@ -37,6 +39,12 @@ const businessData = {
   onboardingComplete: true,
 };
 
+/** Reads the shared provider so a test can see what the shell badge would show. */
+function SettingsProbe() {
+  const { currency, timezone } = useBusinessSettings();
+  return <p data-testid="shared-settings">{`${currency}|${timezone}`}</p>;
+}
+
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +65,30 @@ describe('SettingsPage', () => {
     );
 
     expect(screen.getByText('Loading...')).toBeVisible();
+    // The shell renders while the profile loads, so the page never jumps
+    // between a bare screen and the sidebar layout.
+    expect(screen.getByRole('complementary', { name: /sidebar/i })).toBeVisible();
+  });
+
+  it('renders inside the app shell with the shared timezone badge', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation(async () => jsonResponse(200, { success: true, data: businessData })),
+    );
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    expect(await screen.findByRole('heading', { name: /business profile/i })).toBeVisible();
+
+    const sidebar = screen.getByRole('complementary', { name: /sidebar/i });
+    expect(within(sidebar).getByRole('link', { name: /dashboard/i })).toBeVisible();
+    expect(await within(sidebar).findByText('Asia/Dhaka · BDT')).toBeVisible();
   });
 
   it('covers AC-5: renders the form populated with business data for an OWNER', async () => {
@@ -131,6 +163,137 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(/profile updated/i);
+  });
+
+  it('keeps a valid currency when the save response reports an empty one', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return jsonResponse(200, { success: true, data: { ...businessData, currency: '' } });
+      }
+      return jsonResponse(200, { success: true, data: businessData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /business profile/i });
+    // The provider has the stored currency before the save runs.
+    await waitFor(() =>
+      expect(screen.getByTestId('shared-settings')).toHaveTextContent('BDT|Asia/Dhaka'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await screen.findByRole('status');
+
+    // The malformed currency is ignored instead of blanking the badge and cache.
+    expect(screen.getByTestId('shared-settings')).toHaveTextContent('BDT|Asia/Dhaka');
+    expect(window.localStorage.getItem(businessSettingsCacheKey('biz-1'))).toBe(
+      JSON.stringify({ currency: 'BDT', timezone: 'Asia/Dhaka' }),
+    );
+  });
+
+  it('covers AC-6: applies the saved timezone when the response omits currency', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        // JSON.stringify drops the undefined currency, so the response has a
+        // valid timezone and no currency at all.
+        return jsonResponse(200, {
+          success: true,
+          data: { ...businessData, currency: undefined, timezone: 'Europe/Berlin' },
+        });
+      }
+      return jsonResponse(200, { success: true, data: businessData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByLabelText(/timezone/i);
+    await waitFor(() =>
+      expect(screen.getByTestId('shared-settings')).toHaveTextContent('BDT|Asia/Dhaka'),
+    );
+
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/Berlin');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /change timezone/i }),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/profile updated/i);
+    // The timezone lands even though the currency was missing; the provider
+    // keeps the last valid currency instead of dropping the whole update.
+    expect(screen.getByTestId('shared-settings')).toHaveTextContent('BDT|Europe/Berlin');
+    expect(window.localStorage.getItem(businessSettingsCacheKey('biz-1'))).toBe(
+      JSON.stringify({ currency: 'BDT', timezone: 'Europe/Berlin' }),
+    );
+  });
+
+  it('covers AC-7: drops the saved settings when the business changes in flight', async () => {
+    let resolveSave: (value: Response) => void = () => {};
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return new Promise<Response>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+
+      const auth = getAuth();
+      const data =
+        auth?.businessId === 'biz-2'
+          ? { ...businessData, name: 'Other Co', currency: 'EUR', timezone: 'Europe/Paris' }
+          : businessData;
+      return Promise.resolve(jsonResponse(200, { success: true, data }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+        <SettingsProbe />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /business profile/i });
+    await waitFor(() =>
+      expect(screen.getByTestId('shared-settings')).toHaveTextContent('BDT|Asia/Dhaka'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    // The save belongs to biz-1, but the tab signs in as biz-2 before it lands.
+    act(() => setAuth({ accessToken: 'tok-2', businessId: 'biz-2' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('shared-settings')).toHaveTextContent('EUR|Europe/Paris'),
+    );
+
+    await act(async () => {
+      resolveSave(
+        jsonResponse(200, {
+          success: true,
+          data: { ...businessData, currency: 'USD', timezone: 'America/New_York' },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The response belongs to biz-1, so biz-2 keeps its own settings and cache.
+    expect(screen.getByTestId('shared-settings')).toHaveTextContent('EUR|Europe/Paris');
+    expect(window.localStorage.getItem(businessSettingsCacheKey('biz-2'))).toBe(
+      JSON.stringify({ currency: 'EUR', timezone: 'Europe/Paris' }),
+    );
   });
 
   it('covers AC-6: shows the stored timezone and its description', async () => {
@@ -271,6 +434,39 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
   });
 
+  it('covers AC-6: closes the confirmation and shows the error when the save fails', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return jsonResponse(400, { error: 'Invalid input', message: 'Timezone update failed' });
+      }
+      return jsonResponse(200, { success: true, data: businessData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByLabelText(/timezone/i);
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/Berlin');
+    const saveButton = screen.getByRole('button', { name: /save changes/i });
+    await user.click(saveButton);
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /change timezone/i }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/timezone update failed/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
+    const putCall = fetchMock.mock.calls.find((call) => call[1]?.method === 'PUT');
+    expect(JSON.parse(String(putCall![1]!.body)).timezone).toBe('Europe/Berlin');
+    // covers AC-12: closing the dialog returns focus to the control that opened it
+    await waitFor(() => expect(saveButton).toHaveFocus());
+  });
+
   it('covers AC-12: Escape cancels the timezone dialog', async () => {
     vi.stubGlobal(
       'fetch',
@@ -297,6 +493,152 @@ describe('SettingsPage', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('Asia/Dhaka');
+  });
+
+  it('covers AC-6: ignores Escape while a confirmed timezone save is running', async () => {
+    let resolveSave: (value: Response) => void = () => {};
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return new Promise<Response>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: businessData }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByLabelText(/timezone/i);
+    const timezone = screen.getByRole('combobox', { name: /timezone/i });
+    await user.selectOptions(timezone, 'Europe/Berlin');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /change timezone/i }),
+    );
+
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(timezone).toHaveValue('Europe/Berlin');
+
+    // Escape must not revert the select while the save is still running.
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(timezone).toHaveValue('Europe/Berlin');
+
+    await act(async () => {
+      resolveSave(jsonResponse(400, { error: 'Invalid input', message: 'Timezone update failed' }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/timezone update failed/i);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(timezone).toHaveValue('Europe/Berlin');
+  });
+
+  it('freezes the timezone select while a direct save is in flight', async () => {
+    let resolveSave: (value: Response) => void = () => {};
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return new Promise<Response>((resolve) => {
+          resolveSave = resolve;
+        });
+      }
+      return Promise.resolve(jsonResponse(200, { success: true, data: businessData }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    const timezone = await screen.findByRole('combobox', { name: /timezone/i });
+    // Saving without changing the zone skips the dialog, so this is the path
+    // where a new choice could otherwise land while the request is running.
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
+    expect(timezone).toBeDisabled();
+
+    await act(async () => {
+      resolveSave(jsonResponse(200, { success: true, data: businessData }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/profile updated/i);
+    expect(timezone).toBeEnabled();
+    expect(timezone).toHaveValue('Asia/Dhaka');
+  });
+
+  it('rejects a save when the timezone value is invalid', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return jsonResponse(200, { success: true, data: businessData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    const timezone = await screen.findByRole('combobox', { name: /timezone/i });
+    // The select never offers an empty option, but a corrupted form value must
+    // still block the request instead of saving an invalid zone.
+    fireEvent.change(timezone, { target: { value: '' } });
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/choose a valid timezone/i);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it('covers AC-12: traps Tab inside the timezone dialog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse(200, { success: true, data: businessData })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByLabelText(/timezone/i);
+    await user.selectOptions(screen.getByLabelText(/timezone/i), 'Europe/Berlin');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    const dialog = screen.getByRole('dialog');
+    const saveButton = screen.getByRole('button', { name: /save changes/i });
+    const buttons = within(dialog).getAllByRole('button');
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+
+    // The dialog takes focus first, then Tab moves through its actions in
+    // order (close, cancel, confirm) before wrapping back to the first.
+    expect(dialog).toHaveFocus();
+    for (const button of buttons) {
+      await user.tab();
+      expect(button).toHaveFocus();
+    }
+    await user.tab();
+    expect(first).toHaveFocus();
+    expect(document.activeElement).not.toBe(saveButton);
+
+    // Shift+Tab from the first action wraps to the last.
+    await user.tab({ shift: true });
+    expect(last).toHaveFocus();
   });
 
   it('shows an error message when saving fails', async () => {

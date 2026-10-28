@@ -7,7 +7,12 @@ import {
   getAuthHeaders,
   isTimeoutError,
   setAuth,
+  subscribeToAuth,
 } from '@/lib/auth-client';
+import {
+  businessSettingsCacheKey,
+  writeBusinessSettingsCache,
+} from '@/lib/business-settings-cache';
 
 const TOKEN_KEY = 'accessToken';
 const BUSINESS_ID_KEY = 'businessId';
@@ -43,6 +48,43 @@ describe('auth-client', () => {
       setAuth({ accessToken: 'tok', businessId: 'biz-1' });
       clearAuth();
       expect(getAuth()).toBeNull();
+    });
+  });
+
+  // covers AC-7: the shared settings provider reloads when the active auth changes.
+  describe('subscribeToAuth', () => {
+    it('notifies listeners on setAuth and clearAuth', () => {
+      const listener = vi.fn();
+      const unsubscribe = subscribeToAuth(listener);
+
+      setAuth({ accessToken: 'tok', businessId: 'biz-1' });
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      clearAuth();
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      unsubscribe();
+    });
+
+    it('stops notifying after the listener unsubscribes', () => {
+      const listener = vi.fn();
+      subscribeToAuth(listener)();
+
+      setAuth({ accessToken: 'tok', businessId: 'biz-1' });
+      clearAuth();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('removes only the active business cache on clearAuth', () => {
+      writeBusinessSettingsCache('biz-1', { currency: 'USD', timezone: 'America/New_York' });
+      writeBusinessSettingsCache('biz-2', { currency: 'EUR', timezone: 'Europe/Paris' });
+      setAuth({ accessToken: 'tok', businessId: 'biz-1' });
+
+      clearAuth();
+
+      expect(window.localStorage.getItem(businessSettingsCacheKey('biz-1'))).toBeNull();
+      expect(window.localStorage.getItem(businessSettingsCacheKey('biz-2'))).not.toBeNull();
     });
   });
 

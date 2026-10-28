@@ -90,16 +90,23 @@ export function TimezoneSelect({
   id,
   value,
   onChange,
+  disabled = false,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   const groups = useMemo(() => groupTimeZones(supportedTimeZones(), value), [value]);
   const safeValue = isValidTimeZone(value) ? value : DEFAULT_TIME_ZONE;
 
   return (
-    <Select id={id} value={safeValue} onChange={(event) => onChange(event.target.value)}>
+    <Select
+      disabled={disabled}
+      id={id}
+      value={safeValue}
+      onChange={(event) => onChange(event.target.value)}
+    >
       {groups.map((group) => (
         <optgroup key={group.name} label={group.name}>
           {group.zones.map((zone) => (

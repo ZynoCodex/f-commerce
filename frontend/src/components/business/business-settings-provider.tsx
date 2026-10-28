@@ -21,6 +21,12 @@ export interface BusinessSettings {
   timezone: string;
 }
 
+/** A save response is untrusted, so the provider validates both fields on write. */
+export interface BusinessSettingsInput {
+  currency: unknown;
+  timezone: unknown;
+}
+
 interface BusinessSettingsSnapshot extends BusinessSettings {
   /** The business these settings belong to, or `''` when signed out. */
   businessId: string;
@@ -29,7 +35,11 @@ interface BusinessSettingsSnapshot extends BusinessSettings {
 }
 
 interface BusinessSettingsContextValue extends BusinessSettingsSnapshot {
-  updateSettings: (settings: BusinessSettings) => void;
+  /**
+   * Persist settings for the business that owned the save. Pass the id captured
+   * before the request so a sign out or a switch in flight drops the commit.
+   */
+  updateSettings: (settings: BusinessSettingsInput, targetBusinessId: string) => void;
 }
 
 const FALLBACK_SETTINGS: BusinessSettings = {
@@ -132,6 +142,24 @@ function commitSettings(businessId: string, settings: BusinessSettings): void {
   emit();
 }
 
+/**
+ * Keep the last valid value for any field a caller got wrong. The profile
+ * fetch and the cache read already validate; this does the same for a write,
+ * so one bad field in a 200 response cannot blank the badge or poison the cache
+ * while the other field from the same save still lands.
+ */
+function sanitizeSettings(
+  next: BusinessSettingsInput,
+  fallback: BusinessSettings,
+): BusinessSettings {
+  const currency = CurrencyEnum.safeParse(next.currency);
+  const timezone = TimezoneSchema.safeParse(next.timezone);
+  return {
+    currency: currency.success ? currency.data : fallback.currency,
+    timezone: timezone.success ? timezone.data : fallback.timezone,
+  };
+}
+
 function subscribeToAuthChanges(listener: () => void): () => void {
   return subscribeToAuth(() => {
     // setAuth and clearAuth both change the active business, so a value that
@@ -163,7 +191,10 @@ export function BusinessSettingsProvider({ children }: { children: React.ReactNo
 
     const load = () => {
       const auth = getAuth();
-      if (!auth) return;
+      // An auth listener can fire before React runs this effect's cleanup, so
+      // its captured business may already be stale. Skip that duplicate; the
+      // effect for the new business makes the one request that matters.
+      if (!auth || auth.businessId !== businessId) return;
       const targetBusinessId = auth.businessId;
 
       apiFetch('/api/business/me')
@@ -194,10 +225,12 @@ export function BusinessSettingsProvider({ children }: { children: React.ReactNo
     };
   }, [businessId]);
 
-  const updateSettings = useCallback((next: BusinessSettings) => {
+  const updateSettings = useCallback((next: BusinessSettingsInput, targetBusinessId: string) => {
     const auth = getAuth();
-    if (!auth) return;
-    commitSettings(auth.businessId, next);
+    // A sign out or a switch while the save was in flight must win.
+    if (!auth || auth.businessId !== targetBusinessId) return;
+    // Validate at the write path so every caller is protected, not each call site.
+    commitSettings(targetBusinessId, sanitizeSettings(next, getSnapshot()));
   }, []);
 
   const value = useMemo<BusinessSettingsContextValue>(

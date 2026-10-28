@@ -74,4 +74,30 @@ describe('primitives', () => {
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(last).toHaveFocus();
   });
+
+  it('pulls focus back into an open dialog when focus sits outside it', () => {
+    render(
+      <>
+        <button type="button">Outside</button>
+        <Dialog onClose={() => {}} open title="Confirm">
+          <Button type="button">First</Button>
+          <Button type="button">Last</Button>
+        </Dialog>
+      </>,
+    );
+
+    const outside = screen.getByRole('button', { name: 'Outside' });
+    const close = screen.getByRole('button', { name: 'Close dialog' });
+    const last = screen.getByRole('button', { name: 'Last' });
+
+    // A backdrop click leaves focus on the page body. Tab must enter the
+    // dialog instead of moving through the page behind it.
+    outside.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(close).toHaveFocus();
+
+    outside.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+  });
 });
