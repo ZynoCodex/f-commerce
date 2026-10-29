@@ -14,6 +14,12 @@ export interface IBusinessRepository {
       onboardingDraft?: Business['onboardingDraft'];
     },
   ): Promise<Business | null>;
-  saveDraft(businessId: string, field: string, value: unknown): Promise<void>;
+  /**
+   * Merge one field into the onboarding draft.
+   *
+   * Resolves true when the write landed, false when it was skipped because the
+   * business had already finished onboarding (or the id was not a UUID).
+   */
+  saveDraft(businessId: string, field: string, value: unknown): Promise<boolean>;
   clearDraft(businessId: string): Promise<void>;
 }

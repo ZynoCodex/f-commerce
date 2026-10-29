@@ -100,6 +100,56 @@ test.describe('business onboarding flow', () => {
     await expect(page.getByRole('heading', { name: /keep today moving/i })).toBeVisible();
   });
 
+  // Covers the post sign in redirect: the destination is chosen from the profile,
+  // so a completed owner never sees the wizard after typing their password.
+  test('signing in sends a completed owner to the dashboard and a fresh one to the wizard', async ({
+    page,
+    request: apiRequest,
+  }) => {
+    const completeEmail = `signin-done-${randomUUID().slice(0, 8)}@example.com`;
+    const freshEmail = `signin-new-${randomUUID().slice(0, 8)}@example.com`;
+
+    const complete = await authenticateUser(apiRequest, completeEmail, 'Sign In Done Co');
+    await apiRequest.put('/api/business/onboarding', {
+      data: {
+        name: 'Sign In Done Co',
+        currency: 'BDT',
+        timezone: 'Europe/Berlin',
+        address: { street: '100 Main St', city: 'Dhaka', country: 'Bangladesh' },
+      },
+      headers: {
+        Authorization: `Bearer ${complete.accessToken}`,
+        'x-business-id': complete.businessId,
+      },
+    });
+    // Registered but unfinished, so signing in must still open the wizard.
+    await authenticateUser(apiRequest, freshEmail, 'Sign In New Co');
+
+    const signIn = async (email: string) => {
+      await page.goto('/login');
+      await page.getByRole('textbox', { name: /email/i }).fill(email);
+      await page.getByLabel(/password/i).fill(password);
+      await page.getByRole('button', { name: /^sign in$/i }).click();
+    };
+
+    const wizardSeen: boolean[] = [];
+    page.on('framenavigated', async (frame) => {
+      if (frame === page.mainFrame() && /\/onboarding/.test(frame.url())) wizardSeen.push(true);
+    });
+
+    await signIn(completeEmail);
+    await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /keep today moving/i })).toBeVisible();
+    expect(wizardSeen).toEqual([]);
+
+    // A fresh session for the unfinished owner.
+    await page.context().clearCookies();
+    await page.evaluate(() => window.localStorage.clear());
+    await signIn(freshEmail);
+    await page.waitForURL(/\/onboarding$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /welcome, sign in new co/i })).toBeVisible();
+  });
+
   test('a fresh owner walks the wizard to completion and reaches the dashboard', async ({
     page,
     request: apiRequest,

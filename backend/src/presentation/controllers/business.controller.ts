@@ -331,7 +331,17 @@ businessRouter.put(
         return;
       }
 
-      await businessService.saveDraft(businessId, field, value);
+      // A write is skipped once onboarding completes, so answer 409 rather than
+      // reporting a save that never happened.
+      const saved = await businessService.saveDraft(businessId, field, value);
+      if (!saved) {
+        res.status(409).json({
+          error: 'ONBOARDING_COMPLETE',
+          message: 'Onboarding is already complete, so there is no draft to save',
+        });
+        return;
+      }
+
       res.status(200).json({ success: true, message: 'Draft saved' });
     } catch (error) {
       sendInternalError(res, error);

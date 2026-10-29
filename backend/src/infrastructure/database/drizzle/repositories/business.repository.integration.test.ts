@@ -138,8 +138,9 @@ describe('DrizzleBusinessRepository', () => {
     });
 
     it('merges one draft field without clearing the others', async () => {
-      await repository.saveDraft(BIZ, 'name', 'Renamed Draft');
+      const saved = await repository.saveDraft(BIZ, 'name', 'Renamed Draft');
 
+      expect(saved).toBe(true);
       const result = await repository.findById(BIZ);
       expect(result?.onboardingDraft).toEqual({ name: 'Renamed Draft', currency: 'USD' });
     });
@@ -164,8 +165,10 @@ describe('DrizzleBusinessRepository', () => {
       await repository.updateProfile(BIZ, { onboardingComplete: true });
 
       // Simulates a draft request that was in flight when onboarding finished.
-      await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+      const saved = await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
 
+      // A skipped write must be reported, so the route can answer 409 not 200.
+      expect(saved).toBe(false);
       const result = await repository.findById(BIZ);
       expect(result?.onboardingComplete).toBe(true);
       expect(result?.onboardingDraft).toBeUndefined();
@@ -174,10 +177,19 @@ describe('DrizzleBusinessRepository', () => {
     it('leaves a completed row untouched even when it still carries a draft', async () => {
       await getDb().update(businesses).set({ onboardingComplete: true });
 
-      await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+      const saved = await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
 
+      expect(saved).toBe(false);
       const result = await repository.findById(BIZ);
       // The seeded draft is unchanged: the completed row never accepts the late write.
+      expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
+    });
+
+    it('reports false for an id that is not a UUID without writing anything', async () => {
+      const saved = await repository.saveDraft('not-a-uuid', 'name', 'Ignored');
+
+      expect(saved).toBe(false);
+      const result = await repository.findById(BIZ);
       expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
     });
   });

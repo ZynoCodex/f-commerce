@@ -65,18 +65,24 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
    * finishes. That closes the race where a draft request is already in flight
    * when onboarding completes: if it lands after `clearDraft`, the completed
    * row is left untouched instead of gaining a stale draft.
+   *
+   * @returns true when the write landed, false when the guard skipped it, so a
+   * caller can answer honestly instead of reporting a save that never happened.
    */
-  async saveDraft(businessId: string, field: string, value: unknown): Promise<void> {
-    if (!isUuid(businessId)) return;
+  async saveDraft(businessId: string, field: string, value: unknown): Promise<boolean> {
+    if (!isUuid(businessId)) return false;
 
     const patch = JSON.stringify({ [field]: value });
-    await getDb()
+    const updated = await getDb()
       .update(businesses)
       .set({
         onboardingDraft: sql`coalesce(${businesses.onboardingDraft}, '{}'::jsonb) || ${patch}::jsonb`,
         updatedAt: new Date(),
       })
-      .where(and(eq(businesses.id, businessId), eq(businesses.onboardingComplete, false)));
+      .where(and(eq(businesses.id, businessId), eq(businesses.onboardingComplete, false)))
+      .returning({ id: businesses.id });
+
+    return updated.length > 0;
   }
 
   async clearDraft(businessId: string): Promise<void> {

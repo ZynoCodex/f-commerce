@@ -92,6 +92,19 @@ const DraftAddressSchema = z.object({
 });
 
 /**
+ * Partial onboarding progress kept on the business row. Every field is
+ * optional because the wizard saves one field at a time, and the whole draft is
+ * null once onboarding completes.
+ */
+export const OnboardingDraftSchema = z.object({
+  name: z.string().optional(),
+  currency: CurrencyEnum.optional(),
+  timezone: TimezoneSchema.optional(),
+  address: DraftAddressSchema.optional(),
+  logoUrl: z.string().optional(),
+});
+
+/**
  * Draft save. Drafts hold partial wizard progress, so the address may be
  * incomplete; completion still requires the full AddressSchema.
  */
@@ -112,6 +125,11 @@ export const BusinessResponseSchema = z.object({
     logoUrl: z.string().url().nullable(),
     address: AddressSchema.nullable(),
     onboardingComplete: z.boolean(),
+    /**
+     * Present on GET /me and GET /onboarding. Absent from the payload shape of
+     * the write routes, so it stays optional; null once onboarding completes.
+     */
+    onboardingDraft: OnboardingDraftSchema.nullable().optional(),
   }),
   message: z.string(),
 });
@@ -119,6 +137,7 @@ export const BusinessResponseSchema = z.object({
 export type Currency = z.infer<typeof CurrencyEnum>;
 export type Timezone = z.infer<typeof TimezoneSchema>;
 export type Address = z.infer<typeof AddressSchema>;
+export type OnboardingDraft = z.infer<typeof OnboardingDraftSchema>;
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
 export type BusinessProfileUpdate = z.infer<typeof BusinessProfileUpdateSchema>;
 export type DraftSaveRequest = z.infer<typeof DraftSaveSchema>;

@@ -36,8 +36,14 @@ export class BusinessService {
     return this.businessRepository.updateProfile(businessId, data);
   }
 
-  async saveDraft(businessId: string, field: string, value: unknown): Promise<void> {
-    await this.businessRepository.saveDraft(businessId, field, value);
+  /**
+   * Save one onboarding draft field.
+   *
+   * @returns true when the draft was written, false when onboarding had
+   *   already completed so there was no draft left to write.
+   */
+  async saveDraft(businessId: string, field: string, value: unknown): Promise<boolean> {
+    return this.businessRepository.saveDraft(businessId, field, value);
   }
 
   async completeOnboarding(

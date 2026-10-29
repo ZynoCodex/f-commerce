@@ -37,6 +37,7 @@ _Items 25 and 26 were exercised with harness help. The built page does not expos
 - [x] Send `Asia/Dhaka`, `UTC`, `asia/dhaka`, and an IANA alias the runtime accepts → each saves and reads back in canonical form (the lowercase input reads back as `Asia/Dhaka`, and the alias reads back as the ID the runtime resolves). Send a zone one character over the limit → 400 → AC-2
 - [x] Save `field: 'timezone'` through `PUT /api/business/onboarding/draft`, then read `GET /api/business/onboarding` → the draft carries the zone and the stored value stays unchanged → AC-3
 - [x] Save `field: 'timezone'` with `Mars/Olympus` through the draft endpoint → 400 and the draft is unchanged → AC-2
+- [x] Send `field: 'timezone'` to `PUT /api/business/onboarding/draft` after onboarding is complete → 409 `ONBOARDING_COMPLETE`, and the draft stays `null` → AC-3
 - [x] Call `GET /api/business/me` and `PUT /api/business/me` with no token, a bad token, no business header, and a non member business → 401, 401, 400, and 403 as before → AC-3, AC-12
 - [x] Read `GET /api/orders` and `GET /api/orders/:id` before and after this change → the DTO shape, totals, deadline value, and status fields are unchanged → AC-12
 - [x] Query the live database after the migration → `orders` gained no timezone column and `orders.delivery_deadline` is still a nullable `date` → AC-1

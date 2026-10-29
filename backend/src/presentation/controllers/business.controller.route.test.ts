@@ -681,7 +681,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
 
   // covers AC-1: wizard resume saves draft progress
   it('returns 200 on successful draft save for name field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -695,7 +695,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('returns 200 on successful draft save for currency field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -707,7 +707,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('saves the timezone draft in canonical form', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -730,7 +730,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('returns 200 on successful draft save for address field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
     const address = { street: '1 St', city: 'Dhaka', country: 'Bangladesh' };
 
     const res = await request(app)
@@ -797,7 +797,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('accepts an incomplete address draft with empty strings', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -826,7 +826,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('accepts an empty string for logoUrl (clearing the logo)', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -835,6 +835,34 @@ describe('Business Controller - PUT /onboarding/draft', () => {
 
     expect(res.status).toBe(200);
     expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'logoUrl', '');
+  });
+
+  it('returns 409 instead of claiming a save when onboarding already completed', async () => {
+    // The repository skips the write once onboarding finishes; the route must
+    // not answer 200 for a draft it never stored.
+    saveDraftMock.mockResolvedValueOnce(false);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'Pacific/Apia' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('ONBOARDING_COMPLETE');
+    expect(res.body.message).toMatch(/no draft to save/i);
+    expect(res.body.success).toBeUndefined();
+  });
+
+  it('returns 200 only when the service reports the draft was written', async () => {
+    saveDraftMock.mockResolvedValueOnce(true);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'Pacific/Apia' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, message: 'Draft saved' });
   });
 
   it('returns 500 when the service throws an error without leaking its message', async () => {

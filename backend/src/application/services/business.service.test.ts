@@ -105,20 +105,31 @@ describe('BusinessService', () => {
 
   describe('saveDraft', () => {
     // covers AC-1: wizard resume persists progress to onboardingDraft
-    it('delegates to the repository saveDraft method', async () => {
-      mockBusinessRepository.saveDraft.mockResolvedValueOnce(undefined);
+    it('returns true and delegates to the repository saveDraft method', async () => {
+      mockBusinessRepository.saveDraft.mockResolvedValueOnce(true);
 
-      await businessService.saveDraft('biz1', 'name', 'Draft Co');
+      const saved = await businessService.saveDraft('biz1', 'name', 'Draft Co');
 
+      expect(saved).toBe(true);
       expect(mockBusinessRepository.saveDraft).toHaveBeenCalledWith('biz1', 'name', 'Draft Co');
+    });
+
+    it('reports false when the repository skipped the write', async () => {
+      // A completed business has no draft left to write.
+      mockBusinessRepository.saveDraft.mockResolvedValueOnce(false);
+
+      const saved = await businessService.saveDraft('biz1', 'timezone', 'Pacific/Apia');
+
+      expect(saved).toBe(false);
     });
 
     it('delegates address draft saves to the repository', async () => {
       const addressDraft = { street: '1 St', city: 'City', country: 'BD' };
-      mockBusinessRepository.saveDraft.mockResolvedValueOnce(undefined);
+      mockBusinessRepository.saveDraft.mockResolvedValueOnce(true);
 
-      await businessService.saveDraft('biz1', 'address', addressDraft);
+      const saved = await businessService.saveDraft('biz1', 'address', addressDraft);
 
+      expect(saved).toBe(true);
       expect(mockBusinessRepository.saveDraft).toHaveBeenCalledWith(
         'biz1',
         'address',
