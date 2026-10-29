@@ -105,7 +105,7 @@ test.describe('business onboarding flow', () => {
   test('signing in sends a completed owner to the dashboard and a fresh one to the wizard', async ({
     page,
     request: apiRequest,
-  }) => {
+  }, testInfo) => {
     const completeEmail = `signin-done-${randomUUID().slice(0, 8)}@example.com`;
     const freshEmail = `signin-new-${randomUUID().slice(0, 8)}@example.com`;
 
@@ -141,6 +141,14 @@ test.describe('business onboarding flow', () => {
     await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: /keep today moving/i })).toBeVisible();
     expect(wizardSeen).toEqual([]);
+
+    // covers AC-7: the provider loads the profile after setAuth without a layout
+    // remount, so the shell shows the fetched zone and currency.
+    const badge =
+      testInfo.project.name === 'desktop'
+        ? page.getByRole('complementary', { name: 'Sidebar' }).getByText('Europe/Berlin · BDT')
+        : page.getByRole('banner').getByText('Europe/Berlin · BDT');
+    await expect(badge).toBeVisible();
 
     // A fresh session for the unfinished owner.
     await page.context().clearCookies();
@@ -426,5 +434,128 @@ test.describe('business onboarding flow', () => {
     await page.getByRole('button', { name: /^continue$/i }).click();
 
     await page.getByRole('heading', { name: /your currency, timezone, and logo/i }).waitFor();
+  });
+
+  // covers AC-5: a fresh wizard prefills the browser zone, and a saved draft
+  // wins over that prefill after a reload.
+  test('prefills the browser timezone and resumes the chosen zone from the draft', async ({
+    browser,
+    request: apiRequest,
+  }) => {
+    const email = `tz-draft-${randomUUID().slice(0, 8)}@example.com`;
+    const { accessToken, businessId } = await authenticateUser(
+      apiRequest,
+      email,
+      'Timezone Draft E2E Co',
+    );
+    expect(accessToken).toBeTruthy();
+    expect(businessId).toBeTruthy();
+
+    const context = await browser.newContext({
+      baseURL: 'http://localhost:3000',
+      timezoneId: 'Europe/Berlin',
+    });
+    const page = await context.newPage();
+
+    try {
+      await setAuthState(page, accessToken, businessId);
+      await page.goto('/onboarding');
+      await page.getByRole('heading', { name: /welcome, timezone draft e2e co/i }).waitFor();
+      await page.getByRole('button', { name: /get started/i }).click();
+
+      await page.getByRole('heading', { name: /billing address/i }).waitFor();
+      await page.getByRole('textbox', { name: /street/i }).fill('1 Zone Street');
+      await page.getByRole('textbox', { name: /city/i }).fill('Berlin');
+      await page.getByRole('button', { name: /^continue$/i }).click();
+
+      await page.getByRole('heading', { name: /your currency, timezone, and logo/i }).waitFor();
+      const timezone = page.getByRole('combobox', { name: /timezone/i });
+      await expect(timezone).toHaveValue('Europe/Berlin');
+
+      const draftSaved = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/business/onboarding/draft') && res.request().method() === 'PUT',
+      );
+      await timezone.selectOption('America/New_York');
+      await draftSaved;
+
+      await page.reload();
+      await page.getByRole('heading', { name: /welcome, timezone draft e2e co/i }).waitFor();
+      await page.getByRole('button', { name: /get started/i }).click();
+
+      await page.getByRole('heading', { name: /billing address/i }).waitFor();
+      await page.getByRole('textbox', { name: /city/i }).fill('Berlin');
+      await page.getByRole('button', { name: /^continue$/i }).click();
+
+      await page.getByRole('heading', { name: /your currency, timezone, and logo/i }).waitFor();
+      await expect(page.getByRole('combobox', { name: /timezone/i })).toHaveValue(
+        'America/New_York',
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  // covers AC-6 and AC-11: a corrupt stored zone falls back to Asia/Dhaka in
+  // the settings field and the shell, then a normal save persists the fallback.
+  test('a corrupt stored timezone falls back to Asia/Dhaka without a crash', async ({
+    page,
+    request: apiRequest,
+  }, testInfo) => {
+    const email = `tz-corrupt-${randomUUID().slice(0, 8)}@example.com`;
+    const { accessToken, businessId } = await authenticateUser(
+      apiRequest,
+      email,
+      'Corrupt Zone E2E Co',
+    );
+
+    await apiRequest.put('/api/business/onboarding', {
+      data: {
+        name: 'Corrupt Zone E2E Co',
+        currency: 'BDT',
+        timezone: 'Asia/Dhaka',
+        address: { street: '100 Main St', city: 'Dhaka', country: 'Bangladesh' },
+      },
+      headers: { Authorization: `Bearer ${accessToken}`, 'x-business-id': businessId },
+    });
+
+    await setAuthState(page, accessToken, businessId);
+
+    await page.route('**/api/business/me', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: {
+              name: 'Corrupt Zone E2E Co',
+              currency: 'BDT',
+              timezone: 'Mars/Olympus',
+              logoUrl: null,
+              address: { street: '100 Main St', city: 'Dhaka', country: 'Bangladesh' },
+              onboardingComplete: true,
+            },
+            message: 'Business profile retrieved',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto('/settings');
+    await expect(page.getByRole('combobox', { name: /timezone/i })).toHaveValue('Asia/Dhaka');
+    await expect(page.getByText(/failed to load business/i)).toHaveCount(0);
+
+    const badge =
+      testInfo.project.name === 'desktop'
+        ? page.getByRole('complementary', { name: 'Sidebar' }).getByText('Asia/Dhaka · BDT')
+        : page.getByRole('banner').getByText('Asia/Dhaka · BDT');
+    await expect(badge).toBeVisible();
+
+    await page.getByRole('button', { name: /save changes/i }).click();
+    await expect(page.getByRole('status').filter({ hasText: /profile updated/i })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 });

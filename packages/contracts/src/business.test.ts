@@ -18,6 +18,23 @@ function baseResponse(overrides: Record<string, unknown> = {}) {
 }
 
 describe('business response contract', () => {
+  // covers AC-2 and AC-11: a corrupt stored value must still read, so the
+  // response schema checks that timezone is present but does not validate it.
+  it('requires timezone but accepts a corrupt stored value', () => {
+    const withoutTimeZone: Record<string, unknown> = { ...baseResponse().data };
+    delete withoutTimeZone.timezone;
+
+    expect(
+      BusinessResponseSchema.safeParse({ ...baseResponse(), data: withoutTimeZone }).success,
+    ).toBe(false);
+
+    const corrupt = BusinessResponseSchema.safeParse(baseResponse({ timezone: 'Mars/Olympus' }));
+    expect(corrupt.success).toBe(true);
+    if (corrupt.success) {
+      expect(corrupt.data.data.timezone).toBe('Mars/Olympus');
+    }
+  });
+
   // The endpoints now send the draft, so the schema must declare it.
   it('accepts a partial onboarding draft on the response', () => {
     const parsed = BusinessResponseSchema.parse(

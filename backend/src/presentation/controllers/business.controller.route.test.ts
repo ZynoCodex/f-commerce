@@ -300,6 +300,61 @@ describe('Business Controller - GET /me', () => {
   });
 });
 
+describe('Business Controller - GET /onboarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getBusinessMock.mockReset();
+    updateBusinessMock.mockReset();
+    saveDraftMock.mockReset();
+    completeOnboardingMock.mockReset();
+    uploadLogoMock.mockReset();
+  });
+
+  // covers AC-3: the wizard reads the stored timezone and the draft timezone.
+  it('returns the stored timezone and the draft timezone', async () => {
+    getBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Draft Co',
+      currency: 'BDT',
+      timezone: 'Europe/London',
+      logoUrl: null,
+      address: null,
+      onboardingComplete: false,
+      onboardingDraft: { timezone: 'America/New_York' },
+    });
+
+    const res = await request(app)
+      .get('/api/business/onboarding')
+      .set('x-business-id', 'biz-target');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.timezone).toBe('Europe/London');
+    expect(res.body.data.onboardingDraft).toEqual({ timezone: 'America/New_York' });
+  });
+
+  // covers AC-3: a missing draft reads as null, not undefined.
+  it('returns null for the draft when the business has none', async () => {
+    getBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Fresh Co',
+      currency: 'BDT',
+      timezone: 'Asia/Dhaka',
+      logoUrl: null,
+      address: null,
+      onboardingComplete: false,
+      onboardingDraft: undefined,
+    });
+
+    const res = await request(app)
+      .get('/api/business/onboarding')
+      .set('x-business-id', 'biz-target');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
+    expect(res.body.data.onboardingDraft).toBeNull();
+  });
+});
+
 describe('Business Controller - PUT /me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
