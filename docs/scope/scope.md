@@ -34,6 +34,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 20  | Marketing site                    | Launch     | planned     |
 | 21  | Product variant archiving         | Slice 2    | planned     |
 | 22  | Business timezone                 | Slice 1    | done        |
+| 23  | Team & staff invites              | Slice 1    | planned     |
 
 ## Foundations
 
@@ -158,6 +159,14 @@ Every business stores one IANA timezone and the console uses it for delivery dea
 - [x] Test it: `/test business timezone` — 387 backend (1 skipped), 277 frontend and 112 contract tests pass; added shell day and mobile menu, customer detail timestamps, auth subscription, business day warning, draft race guard, validated settings write, dialog focus trap, token refetch, storage failure, daylight saving, next render after midnight, in flight business switch, the AC-5 and AC-6 field, baseline, corrupt value, and unchanged save coverage, a draft save that answers 409 once onboarding is complete, the post sign in destination that sends a finished owner to the dashboard, a corrupt response schema that still reads, the onboarding read that returns the stored and draft zone, browser prefill and draft resume, a corrupt stored zone falling back to Asia/Dhaka, and two browser zones agreeing on one business timestamp and badge; lint, typecheck and format clean. E2E specs pass on desktop and mobile: 42 passed, including a business on `Pacific/Kiritimati` proving the badge and timestamps use the business zone, and a sign in that never shows the wizard to a completed owner.
 - [x] Review it (fresh model): `/check review business timezone` — See [2026-10-29-feat-business-timezone.md](../reviews/2026-10-29-feat-business-timezone.md), approve with nits on GLM-5.3-Flash, all suites rerun; every open finding from the four earlier passes is fixed and pinned by a named test. Earlier passes: [2026-10-26](../reviews/2026-10-26-feat-business-timezone.md), [2026-10-27](../reviews/2026-10-27-feat-business-timezone.md), [2026-10-28](../reviews/2026-10-28-feat-business-timezone.md), [2026-10-28 2](../reviews/2026-10-28-feat-business-timezone-2.md), [2026-10-28 3](../reviews/2026-10-28-feat-business-timezone-3.md); the stale draft guard and the validated settings write all hold.
 - [x] Document it: `/document business timezone` — See [2026-10-29-feat-business-timezone.md](../PRs/2026-10-29-feat-business-timezone.md)
+
+### 23. Team & staff invites · needs a decision
+
+Finish the staff invite that spec 0003 AC-5 requires. `POST /api/auth/invite` already creates an `INVITED` business member, but nothing delivers the invite, nothing accepts it, `INVITED` never becomes `ACTIVE`, and there is no team screen. Owners manage staff from settings: invite by email, see pending and active members, and change or remove a member's role. Staff keep the permissions the other slices already grant them.
+
+**Done when:** an owner invites a staff member by email, the invitee accepts through a link and sets a password, the membership becomes `ACTIVE`, the invited person can sign in with the permissions of their role, and the owner can view, change, and remove members from a team screen. An invited membership that is never accepted grants no access.
+
+- [ ] Design it (spec): `/architect team & staff invites`
 
 ## Slice 2: Product & Order Workflow
 
@@ -323,3 +332,4 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Courier API integrations**: live tracking once core workflow is stable
 - **Social channel APIs**: Facebook/WhatsApp order import via future integrations
 - **Advanced analytics**: AI insights after basic reporting works
+- **Platform admin console**: a console for the people who run F-Commerce itself, deferred until the MVP proves fit. It is the first feature that may read across tenants, so it needs its own admin role, its own audit trail naming the admin, the target, and what changed, and a deliberate route around the tenant isolation that every seller-facing query enforces. The first version covers finding and opening any business or user, resetting a locked-out account, and the support actions existing slices already assume someone can do by hand, such as cleaning up orphaned Cloudinary assets. Seller-facing isolation must stay unchanged, and a business OWNER or STAFF gets 403 on every admin route
