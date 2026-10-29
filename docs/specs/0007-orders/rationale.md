@@ -91,7 +91,7 @@ The existing order is a strict record with an edit lock once the order moves pas
 
 **Allow past dates with a warning versus reject past dates.** Past dates are allowed. A seller may record an order after the promised day, or record a promise the buyer already missed. A hard rule would block the truth and push the seller to invent a future date. The form warns so a typo is visible, but the save is not blocked.
 
-**Viewer local today versus a server day versus a business timezone now.** The badge compares the stored date with the viewer's local today, the calendar date in the browser's timezone. The stored value is not converted. A server day would use the server's timezone, which has no relationship to the seller. A business timezone is the right long term answer when reports or two viewers need one fixed day boundary, but the business profile has no timezone field today and adding one is a separate change. The limitation is recorded as a follow up.
+**Viewer local today versus a server day versus a business timezone now.** The badge compares the stored date with the viewer's local today, the calendar date in the browser's timezone. The stored value is not converted. A server day would use the server's timezone, which has no relationship to the seller. A business timezone is the right long term answer when reports or two viewers need one fixed day boundary, but the business profile has no timezone field today and adding one is a separate change. The limitation is recorded as a follow up. **(Superseded 2026-10-29: spec 0008 added the business timezone and moved the day rule to it.)**
 
 **Field name `deliveryDeadline` versus `promisedDeliveryDate` versus `dueDate`.** The user asked for a promised delivery date. `deliveryDeadline` is the chosen stored and wire name: it matches the seller's word for the promise and the `Delivery deadline` UI label. `promisedDeliveryDate` is the most faithful name for the requirement, but it is longer and would rename the field, the column, and the contract after the decision was written. `dueDate` is short but reads like money owed, and the order already has `dueAmount`. The chosen name keeps the deadline distinct from the money due, and the promised delivery date stays the plain words every screen uses.
 
@@ -103,10 +103,26 @@ The update is deliberately small. It adds one nullable date to the order, one fi
 
 The date only choice is the important one. A promise is spoken as a day. Storing a timestamp would force a time and a timezone the seller never gave, and the same stored value would render as a different day for different viewers. A `date` column, string mode on the driver, and a date only formatter keep the day stable everywhere. The cost is that the system cannot rank promises within a day, which the product does not need.
 
-The Overdue badge is a view, not a record. It is computed from the stored date and the viewer's local today, so it changes with the calendar without a write. It appears only for `PENDING`, `CONFIRMED`, `PROCESSING`, and `SHIPPED`, because a delivered, cancelled, or returned order no longer needs a delivery follow up. The day itself is not overdue. A deadline of today gives the seller the rest of the day.
+The Overdue badge is a view, not a record. It is computed from the stored date and the business's today (the viewer's local today until 2026-10-29), so it changes with the calendar without a write. It appears only for `PENDING`, `CONFIRMED`, `PROCESSING`, and `SHIPPED`, because a delivered, cancelled, or returned order no longer needs a delivery follow up. The day itself is not overdue. A deadline of today gives the seller the rest of the day.
 
 The edit lock is a deliberate tradeoff. A promise can slip after the order moves to `PROCESSING` or `SHIPPED`, and this slice cannot record that change. The alternative is a separate date edit path, which would weaken, for one field, the rule that the order is locked once fulfillment starts. The cleaner follow up is to let feature 12, which owns delivery, decide how a courier event and a changed promise interact. Until then, the seller can record the promise while the order is `PENDING` or `CONFIRMED`, which covers the moment the promise is usually made.
 
 Past dates are allowed because the record should match what happened. A warning is enough for the common typo, and a hard block would make a late recorded order impossible to represent honestly.
 
 The remaining limits are intentional. No filter means the seller cannot isolate overdue orders, but the Active list already shows the active queue and the badge marks the late ones. No reminder means the seller is not notified, but the badge is visible when the list is open. No index is needed because no query filters or sorts by the deadline. Each of these is a follow up with evidence, not a guess.
+
+## Update 2026-10-29: the promised date follows the business timezone
+
+### Context
+
+The promised delivery date is compared with a day: is that day already past. The 2026-10-23 update took that day from the viewer's browser, so two people in one business could disagree about the same promise near midnight, and the queue looked different on the owner's phone and a staff member's laptop. The gap was recorded as a follow up and closed by scope feature 22, spec 0008, which adds one stored IANA timezone per business.
+
+### Options considered
+
+**Update this spec in place versus supersede it with a new spec versus leave it as written.** In place is chosen. The timezone change alters one rule in a large shipped contract. A new spec would restate the create, edit, status, and duplicate rules only to change how a day is read. Leaving 0007 as written would teach the browser day rule to the next change that reads it.
+
+**State the rule in the acceptance criteria versus only in an update note.** The criteria are the contract `/check verify` checks, so the rule is corrected there (AC-15, AC-19) and the note records what moved and why. Leaving the old text in the criteria with a note beside it would give one contract two answers.
+
+### Rationale
+
+A promise is a day in the seller's working life, not a day on a particular device, so the business row is the right owner. The stored date does not move: only the comparison reads a different clock. Old orders follow the current business zone, which is the deliberate tradeoff recorded in spec 0008, and a timezone change never rewrites a deadline. The badge stays a derived view with no column, no timer, and no API change, and it still renders nothing until the client knows the business zone, so the server and hydration render agree and neither invents a day.

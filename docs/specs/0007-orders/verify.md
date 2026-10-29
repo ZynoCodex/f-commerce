@@ -1,4 +1,4 @@
-# Verify: orders · spec 0007 · updated 2026-10-23
+# Verify: orders · spec 0007 · updated 2026-10-29
 
 _Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
@@ -63,7 +63,7 @@ _Added with the 2026-10-23 update and built in build tasks 10 to 12. `/check ver
 - [x] Move an order with a past deadline to `PROCESSING` and `SHIPPED`, then try a deadline edit → the date and `Overdue` badge stay visible, and the edit returns `ORDER_LOCKED` → AC-9, AC-14, AC-16, AC-19
 - [x] Open a `DELIVERED`, `CANCELLED`, and `RETURNED` order with a past deadline → the date shows and the `Overdue` badge does not → AC-14, AC-16, AC-19
 - [x] Send `2026-02-30`, `2026-13-01`, and `2026-1-1` on create and edit → 400 `VALIDATION_ERROR` with `deliveryDeadline`, and nothing changes → AC-11, AC-19
-- [x] Render a deadline around midnight in two browser timezones, then reload after the local day changes → the date keeps the same calendar day, and the `Overdue` badge follows the viewer's local today → AC-19
+- [x] Render a deadline around midnight in two browser timezones, then reload after the local day changes → the date keeps the same calendar day, and the `Overdue` badge follows the business's today from its stored timezone (since 2026-10-29; the 2026-10-24 run confirmed the earlier viewer local today rule, and [0008 verify](../0008-business-timezone/verify.md) records the business zone run) → AC-19
 - [x] Query the live database for `orders.delivery_deadline` → the nullable `date` column exists, existing rows are null, and no deadline index was added → AC-19
 - [x] Rerun the backend, frontend, and contracts suites plus lint, typecheck, and format → all pass → AC-1 to AC-19 (regression gate)
 
