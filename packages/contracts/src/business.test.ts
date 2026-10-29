@@ -58,12 +58,17 @@ describe('business response contract', () => {
     expect(parsed.data.onboardingDraft).toBeUndefined();
   });
 
-  it('rejects a draft carrying an unknown timezone', () => {
+  // A draft zone written before the rules changed, or edited outside the app,
+  // must read like the stored zone does rather than fail the whole profile.
+  it('accepts a draft carrying an unknown timezone, as it does for the stored zone', () => {
     const result = BusinessResponseSchema.safeParse(
       baseResponse({ onboardingDraft: { timezone: 'Mars/Olympus' } }),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.data.onboardingDraft).toEqual({ timezone: 'Mars/Olympus' });
+    }
   });
 
   it('keeps every draft field optional because the wizard saves one at a time', () => {

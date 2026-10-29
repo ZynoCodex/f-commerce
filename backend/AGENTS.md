@@ -15,7 +15,7 @@ The backend is the Express API workspace. It currently exposes the health endpoi
 | `src/infrastructure/database/drizzle/client.ts`         | Pool, `getDb`, startup probe, test database override                               |
 | `src/infrastructure/database/drizzle/context.ts`        | `AsyncLocalStorage` tenant context (`getTenantId`)                                 |
 | `src/application/services/auth.service.ts`              | Core authentication and tenant logic (Clean Arch)                                  |
-| `src/domain/timezone.ts`                                | Server day rule: `DEFAULT_TIME_ZONE`, `isValidTimeZone`, `todayInTimeZone`        |
+| `src/domain/timezone.ts`                                | Server day rule: `DEFAULT_TIME_ZONE`, `isValidTimeZone`, `todayInTimeZone`         |
 | `package.json`                                          | Backend scripts and dependencies                                                   |
 
 ## Commands

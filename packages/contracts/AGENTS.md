@@ -9,7 +9,7 @@ The contracts package contains shared TypeScript DTOs, Zod schemas, enums, and A
 | File                  | Owns                                                                                |
 | --------------------- | ----------------------------------------------------------------------------------- |
 | `src/index.ts`        | Shared response schemas and inferred types                                          |
-| `src/business.ts`     | Business profile schemas, `TimezoneSchema`, and `resolveTimeZone`                    |
+| `src/business.ts`     | Business profile schemas, `TimezoneSchema`, and `resolveTimeZone`                   |
 | `src/index.test.ts`   | Contract validation tests                                                           |
 | `tsconfig.build.json` | Production build program; excludes `src/**/*.test.ts` so `dist/` ships no test code |
 | `package.json`        | Package exports and scripts                                                         |

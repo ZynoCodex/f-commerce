@@ -95,11 +95,16 @@ const DraftAddressSchema = z.object({
  * Partial onboarding progress kept on the business row. Every field is
  * optional because the wizard saves one field at a time, and the whole draft is
  * null once onboarding completes.
+ *
+ * `timezone` checks presence only, like `data.timezone` on the business
+ * response: a draft written before the zone rules changed, or edited outside
+ * the app, must not fail the whole profile read. Writes are still validated
+ * by `DraftSaveSchema`, so the app cannot store an unknown zone.
  */
 export const OnboardingDraftSchema = z.object({
   name: z.string().optional(),
   currency: CurrencyEnum.optional(),
-  timezone: TimezoneSchema.optional(),
+  timezone: z.string().optional(),
   address: DraftAddressSchema.optional(),
   logoUrl: z.string().optional(),
 });
