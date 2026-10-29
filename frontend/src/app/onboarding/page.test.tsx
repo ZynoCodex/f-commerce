@@ -275,6 +275,27 @@ describe('OnboardingPage', () => {
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
   });
 
+  it('covers AC-5: describes the timezone field as used for delivery deadlines and timestamps', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: incompleteBusiness })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    const timezone = screen.getByRole('combobox', { name: /timezone/i });
+    expect(timezone).toHaveAccessibleDescription(/used for delivery deadlines and timestamps/i);
+  });
+
   it('covers AC-5: saves a changed timezone as a draft', async () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (url === '/api/business/onboarding/draft' && init?.method === 'PUT') {

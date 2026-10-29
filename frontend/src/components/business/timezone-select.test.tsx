@@ -120,4 +120,14 @@ describe('TimezoneSelect', () => {
 
     expect(onChange).toHaveBeenCalledWith('Europe/Berlin');
   });
+
+  it('is enabled by default and disabled when the caller freezes it', () => {
+    const { rerender } = render(
+      <TimezoneSelect id="timezone" value="Asia/Dhaka" onChange={() => {}} />,
+    );
+    expect(screen.getByRole('combobox')).toBeEnabled();
+
+    rerender(<TimezoneSelect disabled id="timezone" value="Asia/Dhaka" onChange={() => {}} />);
+    expect(screen.getByRole('combobox')).toBeDisabled();
+  });
 });

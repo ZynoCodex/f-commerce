@@ -91,6 +91,24 @@ describe('SettingsPage', () => {
     expect(await within(sidebar).findByText('Asia/Dhaka · BDT')).toBeVisible();
   });
 
+  it('covers AC-6: describes the timezone field as used for delivery dates and timestamps', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: businessData })),
+    );
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    const timezone = await screen.findByRole('combobox', { name: /timezone/i });
+    expect(timezone).toHaveValue('Asia/Dhaka');
+    expect(screen.getByText(/used for delivery dates and timestamps/i)).toBeVisible();
+    expect(timezone).toHaveAccessibleDescription(/used for delivery dates and timestamps/i);
+  });
+
   it('covers AC-5: renders the form populated with business data for an OWNER', async () => {
     vi.stubGlobal(
       'fetch',
@@ -600,6 +618,69 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/choose a valid timezone/i);
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it('covers AC-6: saving an unchanged zone skips the dialog and persists the baseline', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      void url;
+      void init;
+      return jsonResponse(200, { success: true, data: businessData });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('combobox', { name: /timezone/i });
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    // No dialog stands between the click and the request.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(/profile updated/i);
+
+    const putCalls = fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT');
+    expect(putCalls).toHaveLength(1);
+    expect(JSON.parse(String(putCalls[0]![1]!.body)).timezone).toBe('Asia/Dhaka');
+  });
+
+  it('covers AC-6: an invalid stored zone shows Asia/Dhaka as the baseline and saves without the dialog', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/business/me' && init?.method === 'PUT') {
+        return jsonResponse(200, {
+          success: true,
+          data: { ...businessData, timezone: 'Asia/Dhaka' },
+        });
+      }
+      // The API returns a corrupt stored value as stored (AC-11).
+      return jsonResponse(200, {
+        success: true,
+        data: { ...businessData, timezone: 'Mars/Olympus' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    const timezone = await screen.findByRole('combobox', { name: /timezone/i });
+    expect(timezone).toHaveValue('Asia/Dhaka');
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(/profile updated/i);
+
+    const putCalls = fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT');
+    expect(putCalls).toHaveLength(1);
+    expect(JSON.parse(String(putCalls[0]![1]!.body)).timezone).toBe('Asia/Dhaka');
   });
 
   it('covers AC-12: traps Tab inside the timezone dialog', async () => {
