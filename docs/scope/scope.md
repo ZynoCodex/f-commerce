@@ -33,7 +33,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 19  | OAuth provider login              | Slice 3    | planned     |
 | 20  | Marketing site                    | Launch     | planned     |
 | 21  | Product variant archiving         | Slice 2    | planned     |
-| 22  | Business timezone                 | Slice 1    | in-progress |
+| 22  | Business timezone                 | Slice 1    | done        |
 
 ## Foundations
 
@@ -140,7 +140,7 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
 - [x] Review it (fresh model): `/check review customers` — See [2026-10-16-feat-customers.md](../reviews/2026-10-16-feat-customers.md)
 - [x] Document it: `/document customers` — See [2026-10-16-feat-customers.md](../PRs/2026-10-16-feat-customers.md)
 
-### 22. Business timezone · in-progress (verified)
+### 22. Business timezone · done
 
 Every business stores one IANA timezone and the console uses it for delivery deadline checks, timestamps, and future server day boundaries. Onboarding asks for the zone, settings can change it with a confirmation, and existing businesses start on `Asia/Dhaka`.
 
@@ -156,8 +156,8 @@ Every business stores one IANA timezone and the console uses it for delivery dea
   - [x] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
 - [x] Verify it: `/check verify business timezone` — all 12 acceptance criteria met; API, onboarding, settings, two zone, midnight, corrupt data, cache, and backend down checks pass; tests, lint, typecheck, format, and build clean. See [verify.md](../specs/0008-business-timezone/verify.md).
 - [x] Test it: `/test business timezone` — 387 backend (1 skipped), 277 frontend and 112 contract tests pass; added shell day and mobile menu, customer detail timestamps, auth subscription, business day warning, draft race guard, validated settings write, dialog focus trap, token refetch, storage failure, daylight saving, next render after midnight, in flight business switch, the AC-5 and AC-6 field, baseline, corrupt value, and unchanged save coverage, a draft save that answers 409 once onboarding is complete, the post sign in destination that sends a finished owner to the dashboard, a corrupt response schema that still reads, the onboarding read that returns the stored and draft zone, browser prefill and draft resume, a corrupt stored zone falling back to Asia/Dhaka, and two browser zones agreeing on one business timestamp and badge; lint, typecheck and format clean. E2E specs pass on desktop and mobile: 42 passed, including a business on `Pacific/Kiritimati` proving the badge and timestamps use the business zone, and a sign in that never shows the wizard to a completed owner.
-- [x] Review it (fresh model): `/check review business timezone` — See [2026-10-26-feat-business-timezone.md](../reviews/2026-10-26-feat-business-timezone.md), approve with three minors and four nits, reviewed on GLM-5.3-Flash-Free; the mobile shell badge, the stale draft guard, and the validated settings write all hold.
-- [ ] Document it: `/document business timezone`
+- [x] Review it (fresh model): `/check review business timezone` — See [2026-10-29-feat-business-timezone.md](../reviews/2026-10-29-feat-business-timezone.md), approve with nits on GLM-5.3-Flash, all suites rerun; every open finding from the four earlier passes is fixed and pinned by a named test. Earlier passes: [2026-10-26](../reviews/2026-10-26-feat-business-timezone.md), [2026-10-27](../reviews/2026-10-27-feat-business-timezone.md), [2026-10-28](../reviews/2026-10-28-feat-business-timezone.md), [2026-10-28 2](../reviews/2026-10-28-feat-business-timezone-2.md), [2026-10-28 3](../reviews/2026-10-28-feat-business-timezone-3.md); the stale draft guard and the validated settings write all hold.
+- [x] Document it: `/document business timezone` — See [2026-10-29-feat-business-timezone.md](../PRs/2026-10-29-feat-business-timezone.md)
 
 ## Slice 2: Product & Order Workflow
 

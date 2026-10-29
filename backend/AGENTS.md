@@ -15,6 +15,7 @@ The backend is the Express API workspace. It currently exposes the health endpoi
 | `src/infrastructure/database/drizzle/client.ts`         | Pool, `getDb`, startup probe, test database override                               |
 | `src/infrastructure/database/drizzle/context.ts`        | `AsyncLocalStorage` tenant context (`getTenantId`)                                 |
 | `src/application/services/auth.service.ts`              | Core authentication and tenant logic (Clean Arch)                                  |
+| `src/domain/timezone.ts`                                | Server day rule: `DEFAULT_TIME_ZONE`, `isValidTimeZone`, `todayInTimeZone`        |
 | `package.json`                                          | Backend scripts and dependencies                                                   |
 
 ## Commands
@@ -54,5 +55,6 @@ Migrations live in `backend/drizzle/migrations/`. `db:generate` derives them fro
 - `vitest.config.ts` excludes `dist/`, so compiled output from an older build is never collected as tests.
 - Foreign keys mean seeded rows need their parents first: insert a `businesses` row before customers, orders, or catalog rows.
 - Timestamps use Drizzle's `Date` mode. Repositories set `updatedAt` by hand; the column default only covers inserts.
+- Any server day boundary (reports, dashboards, daily filters) comes from `todayInTimeZone` in `src/domain/timezone.ts`. It builds `YYYY-MM-DD` from `formatToParts` with a fixed locale, never by slicing a localized string, and falls back to `Asia/Dhaka` for a bad zone. Do not use the server's own zone or `new Date().toISOString().slice(0, 10)`, which is UTC and disagrees with the business day near midnight.
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite._

@@ -29,9 +29,12 @@ npm run e2e        # Playwright end to end tests
 - Prefer server components for data fetching; stream data to the client.
 - Design system: build all UI to `design.md` (art direction and the maximalist product bar); token values live in CSS.
 - Browser code calls the API through relative `/api/...` paths only. Never hardcode a backend host in client code; the Next.js server proxies `/api/*` to `API_ORIGIN`, and `API_ORIGIN` comes from the environment.
+- Read business settings (currency, timezone) from `BusinessSettingsProvider` in `src/components/business/business-settings-provider.tsx`, the one client provider mounted in the root layout. Do not fetch `GET /api/business/me` from a screen just to format money or dates. When the provider gains settings, extend its per-business cache and its auth subscription rather than adding a second request.
 
 ## Gotchas
 
 - The dev server defaults to port 3000 for Next and port 4000 for the Express backend.
 - Do not edit `package-lock.json` directly; run `npm ci` to sync the monorepo lockfile.
 - Run the e2e suite from the frontend workspace after installing Playwright browsers.
+- Dates and times have one owner: the business timezone. Render every timestamp with `formatDateTime(value, timeZone)` from `src/lib/catalog-format.ts`, and compare a stored `YYYY-MM-DD` date with `todayInTimeZone(timeZone)` from `src/lib/timezone.ts`. Never use the browser's local day, `toLocaleDateString()`, or `new Date()` day math for the Overdue badge or the delivery date warning. Render nothing for those until the provider's mounted flag is true, so the server and hydration render match.
+- The stored `deliveryDeadline` is a plain calendar day. Format it with `formatDateOnly` and never pass it through a timestamp, or the day shifts across zones.
