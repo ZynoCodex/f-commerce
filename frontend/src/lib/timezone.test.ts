@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_TIME_ZONE,
+  browserTimeZone,
   formatBusinessDayLabel,
   getDateTimeFormatter,
   isValidTimeZone,
@@ -15,6 +16,20 @@ afterEach(() => {
 // 20:00 UTC is already the next calendar day in Dhaka (UTC+6).
 const LATE_UTC = new Date('2026-10-25T20:00:00.000Z');
 const MIDDAY_UTC = new Date('2026-10-25T12:00:00.000Z');
+
+/** Replaces the no argument formatter the browser uses to report its zone. */
+function stubBrowserZone(zone: string): void {
+  const RealDateTimeFormat = Intl.DateTimeFormat;
+  vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+    locale?: string | string[],
+    options?: Intl.DateTimeFormatOptions,
+  ) {
+    if (locale === undefined && options === undefined) {
+      return { resolvedOptions: () => ({ timeZone: zone }) } as unknown as Intl.DateTimeFormat;
+    }
+    return new RealDateTimeFormat(locale, options);
+  } as typeof Intl.DateTimeFormat);
+}
 
 describe('isValidTimeZone', () => {
   it('accepts an IANA ID and UTC', () => {
@@ -32,6 +47,28 @@ describe('isValidTimeZone', () => {
     expect(isValidTimeZone(' Asia/Dhaka ')).toBe(true);
     expect(normalizeTimeZone(' asia/dhaka ')).toBe('Asia/Dhaka');
     expect(normalizeTimeZone('Mars/Olympus')).toBe(DEFAULT_TIME_ZONE);
+  });
+});
+
+describe('browserTimeZone', () => {
+  it('returns the zone reported by the runtime', () => {
+    stubBrowserZone('Europe/Berlin');
+
+    expect(browserTimeZone()).toBe('Europe/Berlin');
+  });
+
+  it('falls back to Asia/Dhaka when the runtime reports an unknown zone', () => {
+    stubBrowserZone('Mars/Olympus');
+
+    expect(browserTimeZone()).toBe(DEFAULT_TIME_ZONE);
+  });
+
+  it('falls back to Asia/Dhaka when the runtime cannot report a zone', () => {
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function () {
+      throw new Error('Intl unavailable');
+    } as unknown as typeof Intl.DateTimeFormat);
+
+    expect(browserTimeZone()).toBe(DEFAULT_TIME_ZONE);
   });
 });
 

@@ -52,6 +52,17 @@ describe('business response contract', () => {
     expect(parsed.data.onboardingDraft).toBeNull();
   });
 
+  // Onboarding sends '' for "no logo". The API normalizes it to null before it
+  // answers, so the read contract stays strict: a URL or null, never ''.
+  it('accepts a null or URL logo and rejects the empty string the API normalizes away', () => {
+    expect(BusinessResponseSchema.safeParse(baseResponse({ logoUrl: null })).success).toBe(true);
+    expect(
+      BusinessResponseSchema.safeParse(baseResponse({ logoUrl: 'https://cdn.example.com/a.png' }))
+        .success,
+    ).toBe(true);
+    expect(BusinessResponseSchema.safeParse(baseResponse({ logoUrl: '' })).success).toBe(false);
+  });
+
   it('accepts a response that omits the draft, as the write routes do', () => {
     const parsed = BusinessResponseSchema.parse(baseResponse());
 

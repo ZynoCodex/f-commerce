@@ -64,6 +64,20 @@ test.describe('business onboarding flow', () => {
     );
   }
 
+  // Helper to read the owner's profile through the real API.
+  async function readProfile(
+    apiRequest: APIRequestContext,
+    accessToken: string,
+    businessId: string,
+  ) {
+    const res = await apiRequest.get('/api/business/me', {
+      headers: { Authorization: `Bearer ${accessToken}`, 'x-business-id': businessId },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    return body.data as { timezone: string; logoUrl: string | null };
+  }
+
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
   });
@@ -188,7 +202,9 @@ test.describe('business onboarding flow', () => {
     await page.getByRole('combobox', { name: /timezone/i }).selectOption('America/New_York');
     await page.getByRole('button', { name: /^continue$/i }).click();
 
-    // Step 4: review and finish
+    // Step 4: review shows the zone, and a business with no logo shows no image
+    // and no empty source. The profile read answers null, which the shell and
+    // settings render as the name tiles rather than a broken image.
     await page.getByRole('heading', { name: /review and finish/i }).waitFor();
     await expect(page.getByText('Fresh E2E Co')).toBeVisible();
     await expect(page.getByText('BDT · America/New_York')).toBeVisible();
@@ -203,6 +219,13 @@ test.describe('business onboarding flow', () => {
         ? page.getByRole('complementary', { name: 'Sidebar' }).getByText('America/New_York · BDT')
         : page.getByRole('banner').getByText('America/New_York · BDT');
     await expect(badge).toBeVisible();
+
+    // No logo was uploaded, so every read reports no logo and nothing broken.
+    expect((await readProfile(apiRequest, accessToken, businessId)).logoUrl).toBeNull();
+
+    await page.goto('/settings');
+    await expect(page.getByRole('combobox', { name: /timezone/i })).toHaveValue('America/New_York');
+    await expect(page.locator('img[src=""], img[src="null"]')).toHaveCount(0);
   });
 
   test('logo upload succeeds during onboarding step 3', async ({ page, request: apiRequest }) => {
@@ -436,8 +459,8 @@ test.describe('business onboarding flow', () => {
     await page.getByRole('heading', { name: /your currency, timezone, and logo/i }).waitFor();
   });
 
-  // covers AC-5: a fresh wizard prefills the browser zone, and a saved draft
-  // wins over that prefill after a reload.
+  // covers AC-5: a fresh wizard prefills the browser zone, and the country
+  // follows that zone. A saved draft wins over the prefill after a reload.
   test('prefills the browser timezone and resumes the chosen zone from the draft', async ({
     browser,
     request: apiRequest,
@@ -464,6 +487,7 @@ test.describe('business onboarding flow', () => {
       await page.getByRole('button', { name: /get started/i }).click();
 
       await page.getByRole('heading', { name: /billing address/i }).waitFor();
+      await expect(page.getByRole('combobox', { name: /country/i })).toHaveValue('Germany');
       await page.getByRole('textbox', { name: /street/i }).fill('1 Zone Street');
       await page.getByRole('textbox', { name: /city/i }).fill('Berlin');
       await page.getByRole('button', { name: /^continue$/i }).click();
@@ -484,6 +508,7 @@ test.describe('business onboarding flow', () => {
       await page.getByRole('button', { name: /get started/i }).click();
 
       await page.getByRole('heading', { name: /billing address/i }).waitFor();
+      await expect(page.getByRole('combobox', { name: /country/i })).toHaveValue('Germany');
       await page.getByRole('textbox', { name: /city/i }).fill('Berlin');
       await page.getByRole('button', { name: /^continue$/i }).click();
 

@@ -269,7 +269,7 @@ describe('Business Controller - GET /me', () => {
       name: '',
       currency: 'BDT',
       timezone: 'Asia/Dhaka',
-      logoUrl: '',
+      logoUrl: undefined,
       address: null,
       onboardingComplete: false,
       onboardingDraft: draft,

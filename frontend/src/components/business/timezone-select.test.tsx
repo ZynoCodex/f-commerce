@@ -1,28 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  TimezoneSelect,
-  browserTimeZone,
-  groupTimeZones,
-  timeZoneGroup,
-  timeZoneLabel,
-} from './timezone-select';
-
-// `browserTimeZone` asks the runtime for the browser zone with no arguments.
-// Keep the real constructor for every call that passes a locale or options, so
-// schema validation still uses the runtime's own timezone data.
-function stubBrowserTimeZone(zone: string) {
-  const RealDateTimeFormat = Intl.DateTimeFormat;
-  vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
-    locale?: string | string[],
-    options?: Intl.DateTimeFormatOptions,
-  ) {
-    if (locale === undefined && options === undefined) {
-      return { resolvedOptions: () => ({ timeZone: zone }) } as Intl.DateTimeFormat;
-    }
-    return new RealDateTimeFormat(locale, options);
-  } as typeof Intl.DateTimeFormat);
-}
+import { TimezoneSelect, groupTimeZones, timeZoneGroup, timeZoneLabel } from './timezone-select';
 
 describe('timeZoneLabel', () => {
   it('keeps the remainder after the first segment', () => {
@@ -64,24 +42,6 @@ describe('groupTimeZones', () => {
     const groups = groupTimeZones(['Europe/London'], 'Mars/Olympus');
 
     expect(groups.flatMap((group) => group.zones)).toContain('Asia/Dhaka');
-  });
-});
-
-describe('browserTimeZone', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns the browser zone when the runtime accepts it', () => {
-    stubBrowserTimeZone('Europe/Berlin');
-
-    expect(browserTimeZone()).toBe('Europe/Berlin');
-  });
-
-  it('falls back to Asia/Dhaka when the browser zone is invalid', () => {
-    stubBrowserTimeZone('Mars/Olympus');
-
-    expect(browserTimeZone()).toBe('Asia/Dhaka');
   });
 });
 

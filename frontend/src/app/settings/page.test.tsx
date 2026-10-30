@@ -126,7 +126,27 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/currency/i)).toHaveValue('BDT');
     expect(screen.getByRole('textbox', { name: /street/i })).toHaveValue('123 Main St');
     expect(screen.getByRole('textbox', { name: /city/i })).toHaveValue('Dhaka');
-    expect(screen.getByRole('textbox', { name: /country/i })).toHaveValue('Bangladesh');
+    expect(screen.getByRole('combobox', { name: /country/i })).toHaveValue('Bangladesh');
+  });
+
+  it('prefills the country from the timezone when the profile has no address', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          success: true,
+          data: { ...businessData, timezone: 'Europe/Berlin', address: null },
+        }),
+      ),
+    );
+
+    render(
+      <ThemeBoundary>
+        <SettingsPage />
+      </ThemeBoundary>,
+    );
+
+    expect(await screen.findByRole('combobox', { name: /country/i })).toHaveValue('Germany');
   });
 
   it('shows the logo preview when logoUrl is set', async () => {

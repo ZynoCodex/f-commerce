@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   businessSettingsCacheKey,
+  pruneBusinessSettingsCache,
   readBusinessSettingsCache,
   removeBusinessSettingsCache,
   writeBusinessSettingsCache,
@@ -65,7 +66,28 @@ describe('business settings cache', () => {
     });
   });
 
-  it('removes a malformed entry instead of returning it', () => {
+  it('ignores a malformed entry without writing during the read', () => {
+    const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
+
+    for (const raw of [
+      'not json',
+      'null',
+      '[]',
+      JSON.stringify({ currency: 'JPY', timezone: 'Asia/Dhaka' }),
+      JSON.stringify({ currency: 'BDT', timezone: 'Mars/Olympus' }),
+    ]) {
+      window.localStorage.setItem(businessSettingsCacheKey(BUSINESS_ID), raw);
+      removeItem.mockClear();
+
+      expect(readBusinessSettingsCache(BUSINESS_ID)).toBeNull();
+      expect(window.localStorage.getItem(businessSettingsCacheKey(BUSINESS_ID))).toBe(raw);
+      expect(removeItem).not.toHaveBeenCalled();
+    }
+
+    removeItem.mockRestore();
+  });
+
+  it('prunes a malformed entry after the read', () => {
     for (const raw of [
       'not json',
       'null',
@@ -76,8 +98,21 @@ describe('business settings cache', () => {
       window.localStorage.setItem(businessSettingsCacheKey(BUSINESS_ID), raw);
 
       expect(readBusinessSettingsCache(BUSINESS_ID)).toBeNull();
+      pruneBusinessSettingsCache(BUSINESS_ID);
+
       expect(window.localStorage.getItem(businessSettingsCacheKey(BUSINESS_ID))).toBeNull();
     }
+  });
+
+  it('keeps a valid entry when pruning', () => {
+    writeBusinessSettingsCache(BUSINESS_ID, { currency: 'USD', timezone: 'Europe/Berlin' });
+
+    pruneBusinessSettingsCache(BUSINESS_ID);
+
+    expect(readBusinessSettingsCache(BUSINESS_ID)).toEqual({
+      currency: 'USD',
+      timezone: 'Europe/Berlin',
+    });
   });
 
   it('removes an entry on request', () => {

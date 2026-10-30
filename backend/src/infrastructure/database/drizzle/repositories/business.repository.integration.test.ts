@@ -72,6 +72,14 @@ describe('DrizzleBusinessRepository', () => {
     it('returns null for a malformed id instead of raising a query error', async () => {
       expect(await repository.findById('not-a-uuid')).toBeNull();
     });
+
+    it('reads a logo stored as the empty string as no logo', async () => {
+      await getDb().update(businesses).set({ logoUrl: '' });
+
+      const result = await repository.findById(BIZ);
+
+      expect(result?.logoUrl).toBeUndefined();
+    });
   });
 
   describe('updateProfile', () => {
@@ -119,6 +127,18 @@ describe('DrizzleBusinessRepository', () => {
 
     it('returns null when the row is not found', async () => {
       expect(await repository.updateProfile(MISSING, { name: 'X' })).toBeNull();
+    });
+
+    // Onboarding sends '' for "no logo". The store keeps it, so the read must
+    // hand back undefined: otherwise the profile answers '' where the response
+    // contract allows only a URL or null.
+    it('stores an empty logo as no logo and reads it back as undefined', async () => {
+      const result = await repository.updateProfile(BIZ, { logoUrl: '' });
+
+      expect(result?.logoUrl).toBeUndefined();
+      expect(await repository.findById(BIZ)).toMatchObject({ logoUrl: undefined });
+      const raw = await getDb().select().from(businesses);
+      expect(raw[0]?.logoUrl).toBeNull();
     });
 
     it('applies the Asia/Dhaka database default when a new business omits timezone', async () => {

@@ -295,17 +295,19 @@ test.describe('customer records', () => {
     const summary = page.getByRole('heading', { name: 'Spend summary' }).locator('..');
     await expect(summary.getByText('Orders', { exact: true })).toBeVisible();
     await expect(summary.getByText('1', { exact: true })).toBeVisible();
-    await expect(summary.getByText(/\$1,200\.00/)).toHaveCount(2);
+    // The console shows the currency code beside the number, the same way
+    // the order and product screens do, not the device currency symbol.
+    await expect(summary.getByText('1,200 USD', { exact: true })).toHaveCount(2);
 
     const history = page.getByRole('heading', { name: 'Order history' }).locator('..');
     const isNarrow = (page.viewportSize()?.width ?? 0) < 768;
     const orderNumberMatches = history.getByText(orderNumber, { exact: true });
     await expect(isNarrow ? orderNumberMatches.last() : orderNumberMatches.first()).toBeVisible();
     if (isNarrow) {
-      await expect(history.getByText('Total $1,200.00', { exact: true })).toBeVisible();
-      await expect(history.getByText('Due $1,200.00', { exact: true })).toBeVisible();
+      await expect(history.getByText('Total 1,200 USD', { exact: true })).toBeVisible();
+      await expect(history.getByText('Due 1,200 USD', { exact: true })).toBeVisible();
     } else {
-      await expect(history.getByRole('cell', { name: '$1,200.00' })).toHaveCount(2);
+      await expect(history.getByRole('cell', { name: '1,200 USD' })).toHaveCount(2);
     }
   });
 });

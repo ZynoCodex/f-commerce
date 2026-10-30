@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '@/test-utils/render';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +29,7 @@ const incompleteBusiness = {
   name: 'Maya Traders',
   currency: 'BDT',
   timezone: 'Asia/Dhaka',
-  logoUrl: '',
+  logoUrl: null,
   address: null,
   onboardingComplete: false,
 };
@@ -165,6 +165,85 @@ describe('OnboardingPage', () => {
     // now on step 2; Back returns to step 1
     await user.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByText('Step 1 of 4')).toBeVisible();
+  });
+
+  it('prefills the country from the browser timezone instead of a fixed value', async () => {
+    stubBrowserTimeZone('Europe/Berlin');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: incompleteBusiness })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+
+    const country = screen.getByRole('combobox', { name: /country/i });
+    expect(country).toHaveValue('Germany');
+    expect(within(country).getByRole('option', { name: 'Canada' })).toBeInTheDocument();
+    expect(within(country).getByRole('option', { name: 'United States' })).toBeInTheDocument();
+  });
+
+  it('prefills the country from a draft timezone when the draft has no address yet', async () => {
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        currency: 'EUR',
+        timezone: 'Europe/Berlin',
+        logoUrl: '',
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: withDraft })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+
+    expect(screen.getByRole('combobox', { name: /country/i })).toHaveValue('Germany');
+  });
+
+  it('keeps a saved draft country when one was chosen', async () => {
+    stubBrowserTimeZone('Europe/Berlin');
+    const withDraft = {
+      ...incompleteBusiness,
+      onboardingDraft: {
+        currency: 'USD',
+        timezone: 'Europe/Berlin',
+        address: { street: '9 Draft St', city: 'Chittagong', country: 'Bangladesh' },
+        logoUrl: '',
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { success: true, data: withDraft })),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    await screen.findByRole('heading', { name: /welcome/i });
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+
+    expect(screen.getByRole('combobox', { name: /country/i })).toHaveValue('Bangladesh');
   });
 
   it('covers AC-1: restores a saved draft when the profile has one', async () => {
@@ -765,6 +844,30 @@ describe('OnboardingPage', () => {
     expect(greeting).toBeVisible();
     // Get started button should be enabled because the name is pre-filled
     expect(screen.getByRole('button', { name: /get started/i })).toBeEnabled();
+  });
+
+  it('does not treat a different 403 error as the onboarding gate', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/business/onboarding') {
+        return Promise.resolve(jsonResponse(200, { success: true, data: incompleteBusiness }));
+      }
+      return Promise.resolve(
+        jsonResponse(403, {
+          error: 'Forbidden',
+          message: 'Onboarding is not available for this account',
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <ThemeBoundary>
+        <OnboardingPage />
+      </ThemeBoundary>,
+    );
+
+    expect(await screen.findByText(/access denied/i)).toBeVisible();
+    expect(fetchMock.mock.calls.some((call) => call[0] === '/api/business/onboarding')).toBe(false);
   });
 
   it('covers AC-3: rejects a non-image file upload', async () => {
