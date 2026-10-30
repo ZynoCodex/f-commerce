@@ -1,0 +1,149 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ThemeBoundary } from '@/components/theme/theme';
+import { AppShell } from './shell';
+
+// The shell only reads settings; the provider has its own suite.
+const { settings } = vi.hoisted(() => ({
+  settings: { currency: '', timezone: 'Asia/Dhaka', mounted: false },
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
+}));
+
+vi.mock('@/components/business/business-settings-provider', () => ({
+  useBusinessSettings: () => settings,
+}));
+
+function renderShell() {
+  return render(
+    <ThemeBoundary>
+      <AppShell>
+        <p>Page content</p>
+      </AppShell>
+    </ThemeBoundary>,
+  );
+}
+
+describe('AppShell business day', () => {
+  beforeEach(() => {
+    settings.currency = '';
+    settings.timezone = 'Asia/Dhaka';
+    settings.mounted = false;
+
+    // 20:00 UTC is already the next day in Dhaka, so the browser day and the
+    // business day disagree at this instant.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T20:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // covers AC-7: the workspace badge names the business zone and currency.
+  it('prints the business timezone and currency in the workspace badge', () => {
+    settings.currency = 'EUR';
+    settings.timezone = 'Europe/Berlin';
+    settings.mounted = true;
+
+    renderShell();
+
+    expect(
+      within(screen.getByRole('complementary', { name: 'Sidebar' })).getByText(
+        'Europe/Berlin · EUR',
+      ),
+    ).toBeVisible();
+  });
+
+  it('shows the workspace badge in the mobile header', () => {
+    settings.currency = 'EUR';
+    settings.timezone = 'Europe/Berlin';
+    settings.mounted = true;
+
+    renderShell();
+
+    expect(within(screen.getByRole('banner')).getByText('Europe/Berlin · EUR')).toBeVisible();
+  });
+
+  it('keeps the badge readable when the currency is unknown', () => {
+    settings.timezone = 'America/New_York';
+    settings.mounted = true;
+
+    renderShell();
+
+    expect(
+      within(screen.getByRole('complementary', { name: 'Sidebar' })).getByText('America/New_York'),
+    ).toBeVisible();
+  });
+
+  // The mobile top row carries the logo, the day, the theme switcher, and the
+  // menu button; the menu still reaches Settings and closes.
+  it('opens the More sheet from the header menu button and closes it', async () => {
+    settings.currency = 'BDT';
+    settings.mounted = true;
+    const user = userEvent.setup();
+
+    renderShell();
+
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('button', { name: /theme/i })).toBeVisible();
+
+    await user.click(within(header).getByRole('button', { name: /open navigation/i }));
+
+    const sheet = screen.getByRole('dialog', { name: /more/i });
+    expect(within(sheet).getByRole('link', { name: /settings/i })).toBeVisible();
+
+    await user.click(within(sheet).getByRole('button', { name: /close/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // covers AC-9: the header date follows the business zone, not the browser zone.
+  it('shows the business calendar day in the header, not the UTC day', () => {
+    settings.timezone = 'Asia/Dhaka';
+    settings.mounted = true;
+
+    renderShell();
+
+    const day = screen.getByText('Monday, 26 October');
+    expect(day.tagName).toBe('TIME');
+    expect(day).toHaveAttribute('dateTime', '2026-10-26');
+    expect(screen.queryByText('Sunday, 25 October')).toBeNull();
+  });
+
+  // covers AC-7: the day is recomputed at render, so a render after business
+  // midnight shows the new day without waiting for a timer.
+  it('shows the next business day on the next render after midnight', () => {
+    settings.timezone = 'Asia/Dhaka';
+    settings.mounted = true;
+
+    const { rerender } = renderShell();
+    expect(screen.getByText('Monday, 26 October')).toBeVisible();
+
+    vi.setSystemTime(new Date('2026-10-26T20:00:00.000Z'));
+    rerender(
+      <ThemeBoundary>
+        <AppShell>
+          <p>Page content</p>
+        </AppShell>
+      </ThemeBoundary>,
+    );
+
+    const day = screen.getByText('Tuesday, 27 October');
+    expect(day).toHaveAttribute('dateTime', '2026-10-27');
+    expect(screen.queryByText('Monday, 26 October')).toBeNull();
+  });
+
+  // covers AC-9: the day waits for the client clock instead of guessing.
+  it('shows no day until the client clock is known', () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector('time')).toBeNull();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Sidebar' })).getByText('Asia/Dhaka'),
+    ).toBeVisible();
+  });
+});

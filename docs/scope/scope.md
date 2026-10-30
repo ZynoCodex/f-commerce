@@ -33,6 +33,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 19  | OAuth provider login              | Slice 3    | planned |
 | 20  | Marketing site                    | Launch     | planned |
 | 21  | Product variant archiving         | Slice 2    | planned |
+| 22  | Business timezone                 | Slice 1    | done    |
+| 23  | Team & staff invites              | Slice 1    | planned |
 
 ## Foundations
 
@@ -139,6 +141,33 @@ Customer CRUD, search/filter, order history and spending view, clickable phone o
 - [x] Review it (fresh model): `/check review customers` — See [2026-10-16-feat-customers.md](../reviews/2026-10-16-feat-customers.md)
 - [x] Document it: `/document customers` — See [2026-10-16-feat-customers.md](../PRs/2026-10-16-feat-customers.md)
 
+### 22. Business timezone · done
+
+Every business stores one IANA timezone and the console uses it for delivery deadline checks, timestamps, and future server day boundaries. Onboarding asks for the zone, settings can change it with a confirmation, and existing businesses start on `Asia/Dhaka`.
+
+**Done when:** every console date and the Overdue badge follow the stored business timezone, two viewers in different browser zones see the same result for the same deadline, onboarding sets the zone, and settings can change it with a clear warning.
+
+- [x] Design it (spec): `/architect business timezone`
+      Spec [0008](../specs/0008-business-timezone/index.md)
+- [x] Build it: `/develop business timezone`
+  - [x] Data, contracts, and profile API: the column, entity, draft type, schema, migration, repository, and read and write endpoints (AC-1, AC-2, AC-3, AC-4)
+  - [x] Shared provider, cache, auth change signal, shell badge, header date, and currency call replacement (AC-7, AC-11)
+  - [x] Onboarding and settings fields, grouped select, prefill, draft, confirmation dialog, and provider update (AC-5, AC-6, AC-12)
+  - [x] Timestamp formatters, deadline warning, Overdue badge, backend day helper, and tests (AC-8, AC-9, AC-10)
+  - [x] Harden and verify: two zone, daylight saving, invalid, cache, accessibility, and regression cases (AC-1 to AC-12)
+- [x] Verify it: `/check verify business timezone` — all 12 acceptance criteria met; API, onboarding, settings, two zone, midnight, corrupt data, cache, and backend down checks pass; tests, lint, typecheck, format, and build clean. See [verify.md](../specs/0008-business-timezone/verify.md). Re-verified 2026-10-31 after the logo fix: the live column, a wizard completed without a logo, every business read path answering `null`, and the full browser suite pass.
+- [x] Test it: `/test business timezone` — 387 backend (1 skipped), 277 frontend and 112 contract tests pass; added shell day and mobile menu, customer detail timestamps, auth subscription, business day warning, draft race guard, validated settings write, dialog focus trap, token refetch, storage failure, daylight saving, next render after midnight, in flight business switch, the AC-5 and AC-6 field, baseline, corrupt value, and unchanged save coverage, a draft save that answers 409 once onboarding is complete, the post sign in destination that sends a finished owner to the dashboard, a corrupt response schema that still reads, the onboarding read that returns the stored and draft zone, browser prefill and draft resume, a corrupt stored zone falling back to Asia/Dhaka, and two browser zones agreeing on one business timestamp and badge; lint, typecheck and format clean. E2E specs pass on desktop and mobile: 42 passed, including a business on `Pacific/Kiritimati` proving the badge and timestamps use the business zone, and a sign in that never shows the wizard to a completed owner.
+- [x] Review it (fresh model): `/check review business timezone` — See [2026-10-29-feat-business-timezone.md](../reviews/2026-10-29-feat-business-timezone.md), approve with nits on GLM-5.3-Flash, all suites rerun; every open finding from the four earlier passes is fixed and pinned by a named test. Earlier passes: [2026-10-26](../reviews/2026-10-26-feat-business-timezone.md), [2026-10-27](../reviews/2026-10-27-feat-business-timezone.md), [2026-10-28](../reviews/2026-10-28-feat-business-timezone.md), [2026-10-28 2](../reviews/2026-10-28-feat-business-timezone-2.md), [2026-10-28 3](../reviews/2026-10-28-feat-business-timezone-3.md); the stale draft guard and the validated settings write all hold. Whole branch pass: [2026-10-31](../reviews/2026-10-31-feat-business-timezone-review.md), approve with nits on GLM-5.3-Flash, 1 minor and 8 nits, no blockers; the three minors from [2026-10-30](../reviews/2026-10-30-feat-business-timezone-whole-branch.md) are fixed and pinned by tests. The one 2026-10-31 minor is fixed too: a logo cleared at onboarding reads as `null` from the repository up, pinned by integration and contract tests. Second pass the same day: [2026-10-31 review 2](../reviews/2026-10-31-feat-business-timezone-review-2.md), approve with nits on GLM-5.3-Flash, 1 minor and 8 nits, no blockers; the logo fix holds on every read path, and the one minor is stale test fixtures that still use the empty string. That minor is fixed too: the onboarding and route test fixtures now use the shapes the API and entity produce. Third pass the same day, after `/check verify` and a full suite run: [2026-10-31 review 3](../reviews/2026-10-31-feat-business-timezone-review-3.md), approve with nits on GLM-5.3-Flash, 0 minors and 9 nits, no blockers; all four earlier findings are re-verified as holding and the open items are cleanup (dead statements, one duplicated pattern, one comment naming an error code that does not exist). All nine nits from that third pass are now cleared: dead statements and the duplicate export removed, the fallback operator aligned, the comment quoting the real error payload, the draft typed from the contracts, the suppression explained, the backend zone check reusing the contracts helper, the zone to country map pinned by a test, and the customer profile using the shared money format with its browser test updated. Fourth pass the same day, after the nit sweep: [2026-10-31 review 4](../reviews/2026-10-31-feat-business-timezone-review-4.md), approve on GLM-5.3-Flash with 1 nit, no blockers, majors or minors; all nine nits verified genuinely closed in code and tests, every earlier fix re-verified as holding, and the one suspected regression (the backend zone check now accepting padded zone strings) refuted because the previous local copy also trimmed. The one nit, a stale frontend test count in the spec verify notes, is fixed.
+- [x] Document it: `/document business timezone` — See [2026-10-29-feat-business-timezone.md](../PRs/2026-10-29-feat-business-timezone.md)
+
+### 23. Team & staff invites · needs a decision
+
+Finish the staff invite that spec 0003 AC-5 requires. `POST /api/auth/invite` already creates an `INVITED` business member, but nothing delivers the invite, nothing accepts it, `INVITED` never becomes `ACTIVE`, and there is no team screen. Owners manage staff from settings: invite by email, see pending and active members, and change or remove a member's role. Staff keep the permissions the other slices already grant them.
+
+**Done when:** an owner invites a staff member by email, the invitee accepts through a link and sets a password, the membership becomes `ACTIVE`, the invited person can sign in with the permissions of their role, and the owner can view, change, and remove members from a team screen. An invited membership that is never accepted grants no access.
+
+- [ ] Design it (spec): `/architect team & staff invites`
+
 ## Slice 2: Product & Order Workflow
 
 ### 8. Products & categories · done
@@ -180,8 +209,8 @@ Order creation from customer/product selection, status states, order history, so
 
 ### 10. Payments · needs a decision
 
-Payment methods (cash, bKash, Nagad, bank transfer), partial and full payments, due tracking, payment records. Order creation also captures the first payment and its type, so the money taken at the sale is recorded against the order it pays for.
-**Done when:** user can capture a first payment and its type while creating an order, add later payments against the same order, and see the correct paid and due amounts.
+Payment methods (cash, cash on delivery, bKash, Nagad, bank transfer, debit or credit card, PayPal, and other; bKash and Nagad are Bangladesh only), partial and full payments, due tracking, payment records. Order creation also captures the first payment and its method, so the money taken at the sale is recorded against the order it pays for.
+**Done when:** user can capture a first payment and its method while creating an order, add later payments against the same order, and see the correct paid and due amounts.
 
 - [ ] Design it (spec): `/architect payments`
 
@@ -303,3 +332,4 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Courier API integrations**: live tracking once core workflow is stable
 - **Social channel APIs**: Facebook/WhatsApp order import via future integrations
 - **Advanced analytics**: AI insights after basic reporting works
+- **Platform admin console**: a console for the people who run F-Commerce itself, deferred until the MVP proves fit. It is the first feature that may read across tenants, so it needs its own admin role, its own audit trail naming the admin, the target, and what changed, and a deliberate route around the tenant isolation that every seller-facing query enforces. The first version covers finding and opening any business or user, resetting a locked-out account, and the support actions existing slices already assume someone can do by hand, such as cleaning up orphaned Cloudinary assets. Seller-facing isolation must stay unchanged, and a business OWNER or STAFF gets 403 on every admin route

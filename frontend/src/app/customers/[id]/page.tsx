@@ -19,8 +19,10 @@ import {
   Textarea,
 } from '@/components/ui/primitives';
 import { AppShell } from '@/components/shell/shell';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { apiFetch, isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
+import { formatDateTime, formatMoney } from '@/lib/catalog-format';
 import type { CustomerOrderDto, CustomerProfileDto } from '@f-commerce/contracts';
 
 const PAGE_SIZE = 20;
@@ -38,26 +40,11 @@ interface EditForm {
   notes: string;
 }
 
-/** The API sends UTC ISO strings; show them in the seller's own timezone. */
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
-}
-
 export default function CustomerProfilePage() {
   const ready = useRequireAuth();
   const params = useParams<{ id: string }>();
   const customerId = params.id;
+  const { timezone } = useBusinessSettings();
 
   const [customer, setCustomer] = useState<CustomerProfileDto | null>(null);
   const [orders, setOrders] = useState<OrderPage>({ items: [], nextCursor: null });
@@ -327,7 +314,7 @@ export default function CustomerProfilePage() {
       key: 'createdAt' as const,
       label: 'Date',
       render: (row: CustomerOrderDto) => (
-        <span className="text-body">{formatDateTime(row.createdAt)}</span>
+        <span className="text-body">{formatDateTime(row.createdAt, timezone)}</span>
       ),
     },
     { key: 'status' as const, label: 'Status' },
@@ -574,7 +561,9 @@ export default function CustomerProfilePage() {
                   </div>
                   <div>
                     <dt className="text-sm font-semibold text-body">Added</dt>
-                    <dd className="mt-1 text-ink">{formatDateTime(customer.createdAt)}</dd>
+                    <dd className="mt-1 text-ink">
+                      {formatDateTime(customer.createdAt, timezone)}
+                    </dd>
                   </div>
                   <div className="sm:col-span-2">
                     <dt className="text-sm font-semibold text-body">Address</dt>
@@ -591,7 +580,8 @@ export default function CustomerProfilePage() {
                 </dl>
                 {customer.archivedAt && (
                   <p className="border-t border-border pt-4 text-sm text-muted">
-                    Archived on {formatDateTime(customer.archivedAt)}. Their orders stay reachable.
+                    Archived on {formatDateTime(customer.archivedAt, timezone)}. Their orders stay
+                    reachable.
                   </p>
                 )}
               </Card>
@@ -621,7 +611,7 @@ export default function CustomerProfilePage() {
                           <div>
                             <p className="font-mono text-sm text-sky-strong">{order.orderNumber}</p>
                             <p className="mt-1 text-sm text-body">
-                              {formatDateTime(order.createdAt)}
+                              {formatDateTime(order.createdAt, timezone)}
                             </p>
                           </div>
                           <Badge>{order.status}</Badge>

@@ -25,6 +25,7 @@ export const businesses = pgTable('businesses', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   currency: text('currency').notNull().default('BDT'),
+  timezone: text('timezone').notNull().default('Asia/Dhaka'),
   logoUrl: text('logo_url'),
   address: jsonb('address').$type<Address>(),
   onboardingComplete: boolean('onboarding_complete').notNull().default(false),

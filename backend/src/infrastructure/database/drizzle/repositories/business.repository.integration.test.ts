@@ -23,6 +23,7 @@ async function seedBusiness(): Promise<void> {
       id: BIZ,
       name: 'Test Co',
       currency: 'BDT',
+      timezone: 'Europe/London',
       logoUrl: 'https://res.cloudinary.com/demo/img.png',
       address: ADDRESS,
       onboardingComplete: true,
@@ -54,6 +55,7 @@ describe('DrizzleBusinessRepository', () => {
         id: BIZ,
         name: 'Test Co',
         currency: 'BDT',
+        timezone: 'Europe/London',
         logoUrl: 'https://res.cloudinary.com/demo/img.png',
         address: ADDRESS,
         onboardingComplete: true,
@@ -70,6 +72,14 @@ describe('DrizzleBusinessRepository', () => {
     it('returns null for a malformed id instead of raising a query error', async () => {
       expect(await repository.findById('not-a-uuid')).toBeNull();
     });
+
+    it('reads a logo stored as the empty string as no logo', async () => {
+      await getDb().update(businesses).set({ logoUrl: '' });
+
+      const result = await repository.findById(BIZ);
+
+      expect(result?.logoUrl).toBeUndefined();
+    });
   });
 
   describe('updateProfile', () => {
@@ -77,10 +87,12 @@ describe('DrizzleBusinessRepository', () => {
       const result = await repository.updateProfile(BIZ, {
         name: 'Updated Name',
         currency: 'USD',
+        timezone: 'America/New_York',
       });
 
       expect(result?.name).toBe('Updated Name');
       expect(result?.currency).toBe('USD');
+      expect(result?.timezone).toBe('America/New_York');
       // Fields that were not provided keep their stored value.
       expect(result?.logoUrl).toBe('https://res.cloudinary.com/demo/img.png');
       expect(result?.address).toEqual(ADDRESS);
@@ -90,6 +102,7 @@ describe('DrizzleBusinessRepository', () => {
       const result = await repository.updateProfile(BIZ, {
         name: 'New',
         currency: undefined,
+        timezone: undefined,
         logoUrl: undefined,
         address: undefined,
         onboardingComplete: undefined,
@@ -98,6 +111,7 @@ describe('DrizzleBusinessRepository', () => {
 
       expect(result?.name).toBe('New');
       expect(result?.currency).toBe('BDT');
+      expect(result?.timezone).toBe('Europe/London');
       expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
     });
 
@@ -114,12 +128,39 @@ describe('DrizzleBusinessRepository', () => {
     it('returns null when the row is not found', async () => {
       expect(await repository.updateProfile(MISSING, { name: 'X' })).toBeNull();
     });
+
+    // Onboarding sends '' for "no logo". The store keeps it, so the read must
+    // hand back undefined: otherwise the profile answers '' where the response
+    // contract allows only a URL or null.
+    it('stores an empty logo as no logo and reads it back as undefined', async () => {
+      const result = await repository.updateProfile(BIZ, { logoUrl: '' });
+
+      expect(result?.logoUrl).toBeUndefined();
+      expect(await repository.findById(BIZ)).toMatchObject({ logoUrl: undefined });
+      const raw = await getDb().select().from(businesses);
+      expect(raw[0]?.logoUrl).toBeNull();
+    });
+
+    it('applies the Asia/Dhaka database default when a new business omits timezone', async () => {
+      const result = await getDb()
+        .insert(businesses)
+        .values({ name: 'Default Co', currency: 'BDT' })
+        .returning();
+
+      expect(result[0]?.timezone).toBe('Asia/Dhaka');
+    });
   });
 
   describe('saveDraft', () => {
-    it('merges one draft field without clearing the others', async () => {
-      await repository.saveDraft(BIZ, 'name', 'Renamed Draft');
+    // A draft only exists before onboarding finishes; the seeded row is complete.
+    beforeEach(async () => {
+      await getDb().update(businesses).set({ onboardingComplete: false });
+    });
 
+    it('merges one draft field without clearing the others', async () => {
+      const saved = await repository.saveDraft(BIZ, 'name', 'Renamed Draft');
+
+      expect(saved).toBe(true);
       const result = await repository.findById(BIZ);
       expect(result?.onboardingDraft).toEqual({ name: 'Renamed Draft', currency: 'USD' });
     });
@@ -137,6 +178,39 @@ describe('DrizzleBusinessRepository', () => {
 
       const result = await repository.findById(BIZ);
       expect(result?.onboardingDraft).toEqual({ currency: 'GBP' });
+    });
+
+    it('does not resurrect a draft once onboarding is complete', async () => {
+      await repository.clearDraft(BIZ);
+      await repository.updateProfile(BIZ, { onboardingComplete: true });
+
+      // Simulates a draft request that was in flight when onboarding finished.
+      const saved = await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+
+      // A skipped write must be reported, so the route can answer 409 not 200.
+      expect(saved).toBe(false);
+      const result = await repository.findById(BIZ);
+      expect(result?.onboardingComplete).toBe(true);
+      expect(result?.onboardingDraft).toBeUndefined();
+    });
+
+    it('leaves a completed row untouched even when it still carries a draft', async () => {
+      await getDb().update(businesses).set({ onboardingComplete: true });
+
+      const saved = await repository.saveDraft(BIZ, 'timezone', 'America/New_York');
+
+      expect(saved).toBe(false);
+      const result = await repository.findById(BIZ);
+      // The seeded draft is unchanged: the completed row never accepts the late write.
+      expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
+    });
+
+    it('reports false for an id that is not a UUID without writing anything', async () => {
+      const saved = await repository.saveDraft('not-a-uuid', 'name', 'Ignored');
+
+      expect(saved).toBe(false);
+      const result = await repository.findById(BIZ);
+      expect(result?.onboardingDraft).toEqual({ name: 'Draft Co', currency: 'USD' });
     });
   });
 

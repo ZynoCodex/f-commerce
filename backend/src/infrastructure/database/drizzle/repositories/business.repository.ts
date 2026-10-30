@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { businesses } from '../schema.js';
 import { isUuid } from '../../../../domain/uuid.js';
@@ -10,7 +10,8 @@ function toBusiness(row: typeof businesses.$inferSelect): Business {
     id: row.id,
     name: row.name,
     currency: row.currency as Business['currency'],
-    logoUrl: row.logoUrl ?? undefined,
+    timezone: row.timezone,
+    logoUrl: row.logoUrl || undefined,
     address: row.address ?? undefined,
     onboardingComplete: row.onboardingComplete,
     onboardingDraft: row.onboardingDraft ?? undefined,
@@ -32,6 +33,7 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     data: {
       name?: string;
       currency?: string;
+      timezone?: string;
       address?: Business['address'];
       logoUrl?: string;
       onboardingComplete?: boolean;
@@ -43,7 +45,8 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     const changes: Partial<typeof businesses.$inferInsert> = { updatedAt: new Date() };
     if (data.name !== undefined) changes.name = data.name;
     if (data.currency !== undefined) changes.currency = data.currency;
-    if (data.logoUrl !== undefined) changes.logoUrl = data.logoUrl;
+    if (data.timezone !== undefined) changes.timezone = data.timezone;
+    if (data.logoUrl !== undefined) changes.logoUrl = data.logoUrl || null;
     if (data.address !== undefined) changes.address = data.address;
     if (data.onboardingComplete !== undefined) changes.onboardingComplete = data.onboardingComplete;
     if (data.onboardingDraft !== undefined) changes.onboardingDraft = data.onboardingDraft;
@@ -56,18 +59,30 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     return result.length > 0 ? toBusiness(result[0]) : null;
   }
 
-  /** Merge one draft field, preserving every other field already saved. */
-  async saveDraft(businessId: string, field: string, value: unknown): Promise<void> {
-    if (!isUuid(businessId)) return;
+  /**
+   * Merge one draft field, preserving every other field already saved.
+   * A completed business has no draft, so the write is skipped once onboarding
+   * finishes. That closes the race where a draft request is already in flight
+   * when onboarding completes: if it lands after `clearDraft`, the completed
+   * row is left untouched instead of gaining a stale draft.
+   *
+   * @returns true when the write landed, false when the guard skipped it, so a
+   * caller can answer honestly instead of reporting a save that never happened.
+   */
+  async saveDraft(businessId: string, field: string, value: unknown): Promise<boolean> {
+    if (!isUuid(businessId)) return false;
 
     const patch = JSON.stringify({ [field]: value });
-    await getDb()
+    const updated = await getDb()
       .update(businesses)
       .set({
         onboardingDraft: sql`coalesce(${businesses.onboardingDraft}, '{}'::jsonb) || ${patch}::jsonb`,
         updatedAt: new Date(),
       })
-      .where(eq(businesses.id, businessId));
+      .where(and(eq(businesses.id, businessId), eq(businesses.onboardingComplete, false)))
+      .returning({ id: businesses.id });
+
+    return updated.length > 0;
   }
 
   async clearDraft(businessId: string): Promise<void> {

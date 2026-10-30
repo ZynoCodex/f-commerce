@@ -1,10 +1,13 @@
 import type { OrderDto, OrderStatusType, OrderSummaryDto } from '@f-commerce/contracts';
 import { Badge } from '@/components/ui/primitives';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { formatDateOnly, isOverdue } from '@/lib/catalog-format';
+import { todayInTimeZone } from '@/lib/timezone';
 
 /**
  * The `Overdue` badge. It is derived at render time from the stored promise and
- * the viewer's local today, so it never needs a stored flag or a timer.
+ * the business's today, so it never needs a stored flag or a timer. Before the
+ * client day is known it renders nothing rather than guessing.
  */
 export function OrderDeadlineBadge({
   deliveryDeadline,
@@ -13,7 +16,11 @@ export function OrderDeadlineBadge({
   deliveryDeadline: string | null;
   status: OrderStatusType;
 }) {
-  if (!isOverdue(deliveryDeadline, status)) return null;
+  const { timezone, mounted } = useBusinessSettings();
+  if (!mounted) return null;
+
+  const today = todayInTimeZone(timezone);
+  if (!isOverdue(deliveryDeadline, status, today)) return null;
   return <Badge className="bg-danger-soft text-danger">Overdue</Badge>;
 }
 

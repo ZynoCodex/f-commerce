@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { render } from '@/test-utils/render';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CustomerDto, OrderDto, ProductDto } from '@f-commerce/contracts';
@@ -159,6 +160,7 @@ describe('NewOrderPage', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -268,6 +270,45 @@ describe('NewOrderPage', () => {
     expect(JSON.parse(String((postCall?.[1] as RequestInit).body))).toMatchObject({
       deliveryDeadline: '2020-01-01',
     });
+  });
+
+  // covers AC-9: the warning compares the promise with the business day, not the browser day.
+  it('compares a past deadline with the business day, not the browser day', async () => {
+    // 02:00 UTC on 25 October is still 24 October in New York.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T02:00:00.000Z'));
+
+    installedFetch((url) => {
+      if (url === '/api/business/me') {
+        return jsonResponse(200, {
+          success: true,
+          data: { currency: 'BDT', timezone: 'America/New_York' },
+        });
+      }
+      return undefined;
+    });
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Create order' });
+    // The badge renders twice, once in the sidebar and once in the mobile header.
+    expect(
+      await within(screen.getByRole('complementary', { name: 'Sidebar' })).findByText(
+        'America/New_York · BDT',
+      ),
+    ).toBeVisible();
+
+    const deadline = screen.getByLabelText('Delivery deadline');
+    const warning = () =>
+      screen.queryByText('This date has already passed. You can still save the order.');
+
+    // 24 October is today in New York, so the promise is not late.
+    fireEvent.change(deadline, { target: { value: '2026-10-24' } });
+    expect(warning()).toBeNull();
+
+    // 23 October is yesterday in New York, so the warning appears.
+    fireEvent.change(deadline, { target: { value: '2026-10-23' } });
+    expect(warning()).toBeVisible();
   });
 
   it('warns about a duplicate and reuses the same idempotency key when confirmed', async () => {

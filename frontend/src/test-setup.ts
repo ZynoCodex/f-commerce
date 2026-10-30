@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
+
+// Query helpers default to one second. Under a loaded run, debounced requests
+// can take longer than that, so wait up to five seconds before giving up.
+configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();

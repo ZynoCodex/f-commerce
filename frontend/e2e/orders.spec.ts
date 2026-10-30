@@ -11,7 +11,7 @@ test.use({ baseURL: 'http://localhost:3000' });
 
 const password = 'password123';
 
-async function signUpOwner(apiRequest: APIRequestContext) {
+async function signUpOwner(apiRequest: APIRequestContext, timezone = 'Asia/Dhaka') {
   const email = `order-${randomUUID().slice(0, 8)}@example.com`;
   const res = await apiRequest.post('/api/auth/register', {
     data: { email, password, name: 'Owner', businessName: 'Orders E2E Co' },
@@ -25,6 +25,7 @@ async function signUpOwner(apiRequest: APIRequestContext) {
     data: {
       name: 'Orders E2E Co',
       currency: 'USD',
+      timezone,
       address: { street: '1 E2E Street', city: 'Dhaka', country: 'Bangladesh' },
     },
     headers: { Authorization: `Bearer ${accessToken}`, 'x-business-id': businessId },
@@ -279,5 +280,123 @@ test.describe('orders', () => {
     await expect(page.getByText('Order updated.')).toBeVisible();
     await expect(page.getByText('Not set')).toBeVisible();
     await expect(page.getByText('Overdue', { exact: true })).toHaveCount(0);
+  });
+
+  // covers AC-8, AC-9: a business on Pacific/Kiritimati is already a day ahead
+  // of the browser. The badge and the warning must use the business day, and
+  // every timestamp renders in the business zone.
+  test('derives the badge and timestamps from the business zone, not the browser', async ({
+    page,
+    request: apiRequest,
+  }) => {
+    const { accessToken, businessId } = await signUpOwner(apiRequest, 'Pacific/Kiritimati');
+    const seeded = await seedCatalogAndCustomer(apiRequest, accessToken, businessId);
+    await setAuthState(page, accessToken, businessId);
+
+    await page.goto('/orders/new');
+    await expect(page.getByRole('heading', { level: 1, name: 'Create order' })).toBeVisible();
+    await pickCustomerAndProduct(page, seeded);
+
+    // Today in Kiritimati is always at least as late as today in UTC. A past
+    // date therefore always reads as passed there, and the badge must appear.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+
+    await page.getByLabel('Delivery deadline').fill(yesterday);
+    await expect(
+      page.getByText('This date has already passed. You can still save the order.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Create order', exact: true }).click();
+    await page.waitForURL(
+      /\/orders\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+
+    await expect(page.getByText('Overdue', { exact: true })).toBeVisible();
+
+    // The placed time carries the business wall clock, never the browser's
+    // (AC-8). Compare the rendered hour with the hour in each zone right now.
+    const placed = page.getByText(/Placed/).first();
+    await expect(placed).toBeVisible();
+    const placedText = (await placed.textContent()) ?? '';
+    const hourIn = (timeZone: string) =>
+      new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone }).format(
+        new Date(),
+      );
+
+    const renderedHour = placedText.match(/(\d{1,2}):\d{2}\s?(AM|PM)/);
+    expect(renderedHour).not.toBeNull();
+    const hour24 = ((Number(renderedHour![1]) % 12) + (renderedHour![2] === 'PM' ? 12 : 0)) % 24;
+
+    // Kiritimati is UTC+14 and the Playwright browser runs on UTC, so a
+    // timestamp rendered in the browser zone could not land on the business hour.
+    expect(Math.abs(Number(hourIn('Pacific/Kiritimati')) - hour24)).toBeLessThanOrEqual(1);
+    expect(Math.abs(Number(hourIn('UTC')) - hour24)).toBeGreaterThan(1);
+  });
+
+  // covers AC-8 and AC-9: two viewers in different browser zones see the same
+  // business zone timestamp and the same overdue result for one stored order.
+  test('two browser zones see the same business timestamp and badge', async ({
+    browser,
+    request: apiRequest,
+  }) => {
+    const { accessToken, businessId } = await signUpOwner(apiRequest, 'Pacific/Kiritimati');
+    const seeded = await seedCatalogAndCustomer(apiRequest, accessToken, businessId);
+
+    const orderRes = await apiRequest.post('/api/orders', {
+      data: {
+        customerId: seeded.customerId,
+        items: [{ productId: seeded.productId, quantity: 1 }],
+        source: 'DIRECT',
+        deliveryDeadline: '2020-01-01',
+      },
+      headers: as(accessToken, businessId),
+    });
+    expect(orderRes.ok()).toBe(true);
+    const order = (await orderRes.json()).data as { id: string; createdAt: string };
+    const orderId = order.id;
+    const createdAt = order.createdAt;
+
+    const readInZone = async (timezoneId: string) => {
+      const context = await browser.newContext({
+        baseURL: 'http://localhost:3000',
+        timezoneId,
+      });
+      const page = await context.newPage();
+
+      try {
+        await setAuthState(page, accessToken, businessId);
+        await page.goto(`/orders/${orderId}`);
+        await expect(page.getByRole('heading', { level: 1, name: 'ORD-0001' })).toBeVisible();
+        await expect(page.getByText('Overdue', { exact: true })).toBeVisible();
+
+        // Wait for the provider profile fetch so the business zone is applied.
+        await expect(
+          page.getByText('Pacific/Kiritimati · USD').filter({ visible: true }).first(),
+        ).toBeVisible();
+
+        const placed = page.getByText(/Placed/).first();
+        await expect(placed).toBeVisible();
+        return (await placed.textContent()) ?? '';
+      } finally {
+        await context.close();
+      }
+    };
+
+    const midway = await readInZone('Pacific/Midway');
+    const kiritimati = await readInZone('Pacific/Kiritimati');
+
+    // A browser zone timestamp would differ by a whole day between these two.
+    expect(midway).toBe(kiritimati);
+
+    const formatIn = (timeZone: string) =>
+      new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+      }).format(new Date(createdAt));
+
+    // The same stored instant renders in the business zone, never Midway.
+    expect(kiritimati).toContain(formatIn('Pacific/Kiritimati'));
+    expect(kiritimati).not.toContain(formatIn('Pacific/Midway'));
   });
 });

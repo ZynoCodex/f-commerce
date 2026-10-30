@@ -16,6 +16,7 @@ import { Currency } from '../../domain/entities/business.entity.js';
 export interface BusinessUpdateData {
   name?: string;
   currency?: Currency;
+  timezone?: string;
   logoUrl?: string;
   address?: AddressData;
   onboardingComplete?: boolean;
@@ -35,8 +36,14 @@ export class BusinessService {
     return this.businessRepository.updateProfile(businessId, data);
   }
 
-  async saveDraft(businessId: string, field: string, value: unknown): Promise<void> {
-    await this.businessRepository.saveDraft(businessId, field, value);
+  /**
+   * Save one onboarding draft field.
+   *
+   * @returns true when the draft was written, false when onboarding had
+   *   already completed so there was no draft left to write.
+   */
+  async saveDraft(businessId: string, field: string, value: unknown): Promise<boolean> {
+    return this.businessRepository.saveDraft(businessId, field, value);
   }
 
   async completeOnboarding(
@@ -44,16 +51,20 @@ export class BusinessService {
     data: {
       name: string;
       currency: Currency;
+      timezone: string;
       address: AddressData;
       logoUrl?: string;
     },
   ): Promise<Business | null> {
-    if (!data.name || !data.currency || !data.address) {
-      throw new BadRequestError('Name, currency, and address are required to complete onboarding');
+    if (!data.name || !data.currency || !data.timezone || !data.address) {
+      throw new BadRequestError(
+        'Name, currency, timezone, and address are required to complete onboarding',
+      );
     }
     const updated = await this.businessRepository.updateProfile(businessId, {
       name: data.name,
       currency: data.currency,
+      timezone: data.timezone,
       address: data.address,
       logoUrl: data.logoUrl,
       onboardingComplete: true,

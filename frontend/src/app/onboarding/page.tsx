@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primitives';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
-import type { BusinessProfile } from '@f-commerce/contracts';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { CountrySelect } from '@/components/business/country-select';
+import { TimezoneSelect } from '@/components/business/timezone-select';
+import { DEFAULT_COUNTRY, browserCountry, countryForTimeZone } from '@/lib/countries';
+import { DEFAULT_TIME_ZONE, browserTimeZone } from '@/lib/timezone';
+import { TimezoneSchema, type BusinessProfile, type OnboardingDraft } from '@f-commerce/contracts';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -21,20 +26,39 @@ type Address = {
 type OnboardingForm = {
   name: string;
   currency: BusinessProfile['currency'];
+  timezone: string;
   address: Address;
   logoUrl: string;
 };
 
-type DraftField = 'currency' | 'address';
+type DraftField = 'currency' | 'timezone' | 'address';
 
 // Cache to track saved draft values and avoid redundant API calls
 const savedDraftCache: Record<DraftField, string> = {
   currency: '',
+  timezone: '',
   address: '',
 };
 
-let pendingSave: { field: DraftField; value: unknown } | null = null;
+// Keep one pending value per field: timezone and currency sit on the same step,
+// so a second change inside the debounce window must not drop the first draft.
+const pendingSaves = new Map<DraftField, unknown>();
 let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelDraftSave() {
+  if (draftDebounceTimer) {
+    clearTimeout(draftDebounceTimer);
+    draftDebounceTimer = null;
+  }
+  pendingSaves.clear();
+}
+
+function resetDraftState() {
+  cancelDraftSave();
+  savedDraftCache.currency = '';
+  savedDraftCache.timezone = '';
+  savedDraftCache.address = '';
+}
 
 function scheduleDraftSave(field: DraftField, value: unknown) {
   const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -43,43 +67,54 @@ function scheduleDraftSave(field: DraftField, value: unknown) {
   if (savedDraftCache[field] === serialized) return;
   savedDraftCache[field] = serialized;
 
-  // Store the most recent pending save
-  pendingSave = { field, value };
+  // Keep every field changed inside the window, so the next timer flush sends them all.
+  pendingSaves.set(field, value);
 
   // Reset debounce timer
   if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
 
   draftDebounceTimer = setTimeout(async () => {
-    if (!pendingSave) return;
+    draftDebounceTimer = null;
+    const batch = [...pendingSaves.entries()];
+    pendingSaves.clear();
 
-    try {
-      await apiFetch('/api/business/onboarding/draft', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          field: pendingSave.field,
-          value: pendingSave.value,
-        }),
-      });
-    } catch {
-      // Silently fail - draft is for convenience, not critical
-    }
-
-    pendingSave = null;
+    // One request per field, isolated so one failure cannot drop the others.
+    await Promise.all(
+      batch.map(async ([pendingField, pendingValue]) => {
+        try {
+          await apiFetch('/api/business/onboarding/draft', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              field: pendingField,
+              value: pendingValue,
+            }),
+          });
+        } catch {
+          // Silently fail - draft is for convenience, not critical
+        }
+      }),
+    );
   }, 500); // 500ms debounce
 }
 
 type BusinessData = {
   name: string;
   currency: string;
+  timezone: string;
   logoUrl: string | null;
   address: Address | null;
   onboardingComplete: boolean;
-  onboardingDraft?: OnboardingForm | null;
+  /**
+   * Partial wizard progress, so every field is optional: a draft saved after
+   * step one has no address yet.
+   */
+  onboardingDraft?: OnboardingDraft | null;
 };
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { businessId, updateSettings } = useBusinessSettings();
 
   // Gate the whole flow behind authentication before any API call.
   // All hooks below are called unconditionally so hook order is stable
@@ -96,19 +131,22 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<OnboardingForm>({
     name: '',
     currency: 'BDT',
+    timezone: DEFAULT_TIME_ZONE,
     address: {
       street: '',
       city: '',
       region: '',
       postalCode: '',
-      country: 'Bangladesh',
+      country: DEFAULT_COUNTRY,
     },
     logoUrl: '',
   });
 
   useEffect(() => {
     let cancelled = false;
-    void cancelled;
+
+    // Drop any draft state from a previous business or mount.
+    resetDraftState();
 
     apiFetch('/api/business/me', {
       method: 'GET',
@@ -116,7 +154,7 @@ export default function OnboardingPage() {
       .then(async (res) => {
         if (res.status === 403 && res.headers.get('content-type')?.includes('json')) {
           return res.json().then(async (data) => {
-            if (data.error?.includes('Onboarding') || data.message?.includes('Onboarding')) {
+            if (data.error === 'Onboarding required') {
               const onboardingRes = await apiFetch('/api/business/onboarding', { method: 'GET' });
               if (!onboardingRes.ok) throw new Error('Failed to load onboarding');
               return onboardingRes.json();
@@ -143,26 +181,50 @@ export default function OnboardingPage() {
             const currency = (draft.currency ||
               data.data.currency ||
               'BDT') as BusinessProfile['currency'];
-            const address = draft.address || data.data.address || form.address;
+            const draftTimeZone = TimezoneSchema.safeParse(draft.timezone);
+            const timezone = draftTimeZone.success ? draftTimeZone.data : browserTimeZone();
+            const savedAddress = draft.address || data.data.address;
+            // A draft saved before the address step has no country yet. Follow
+            // the timezone the seller would see, not the default country.
+            const address: Address = savedAddress
+              ? {
+                  ...savedAddress,
+                  country:
+                    savedAddress.country || (countryForTimeZone(timezone) ?? DEFAULT_COUNTRY),
+                }
+              : {
+                  ...form.address,
+                  country: countryForTimeZone(timezone) ?? DEFAULT_COUNTRY,
+                };
             const logoUrl = draft.logoUrl || data.data.logoUrl || '';
 
             setForm({
               name: businessName,
               currency,
+              timezone,
               address,
               logoUrl,
             });
 
             // Update draft cache with loaded values
             savedDraftCache.currency = currency;
+            savedDraftCache.timezone = timezone;
             savedDraftCache.address = JSON.stringify(address);
 
             if (draft.logoUrl || data.data.logoUrl) {
               setLogoPreview(draft.logoUrl || data.data.logoUrl || null);
             }
           } else {
-            // No draft yet — just pre-fill the name from DB
-            setForm((prev) => ({ ...prev, name: businessName }));
+            // No draft yet — pre-fill the name, the device's country, and zone.
+            setForm((prev) => ({
+              ...prev,
+              name: businessName,
+              timezone: browserTimeZone(),
+              address: {
+                ...prev.address,
+                country: data.data.address?.country || browserCountry(),
+              },
+            }));
           }
         }
       })
@@ -177,13 +239,12 @@ export default function OnboardingPage() {
 
     return () => {
       cancelled = true;
-      // Clear pending draft save on unmount
-      if (draftDebounceTimer) {
-        clearTimeout(draftDebounceTimer);
-        draftDebounceTimer = null;
-      }
-      pendingSave = null;
+      // Drop the pending save and the cache on unmount.
+      resetDraftState();
     };
+    // Load once per mount: this reads the saved profile and seeds the form, so a
+    // re-run on every render of the router or the draft helpers would overwrite
+    // what the seller has typed.
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) return <div className="p-8">Loading your profile...</div>;
@@ -229,6 +290,16 @@ export default function OnboardingPage() {
   };
 
   const completeOnboarding = async () => {
+    const parsedTimeZone = TimezoneSchema.safeParse(form.timezone);
+    if (!parsedTimeZone.success) {
+      setError('Choose a valid timezone before finishing.');
+      return;
+    }
+
+    // Stop a pending draft write from landing after completion clears the draft.
+    cancelDraftSave();
+    // Capture the owner before the request so a switch in flight drops the save.
+    const targetBusinessId = businessId;
     setSubmitting(true);
     setError(null);
 
@@ -239,6 +310,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: form.name,
           currency: form.currency,
+          timezone: parsedTimeZone.data,
           address: form.address,
           logoUrl: form.logoUrl,
         }),
@@ -249,6 +321,20 @@ export default function OnboardingPage() {
         throw new Error(data.message || 'Failed to complete onboarding');
       }
 
+      const data = await res.json();
+      const saved = data.data as { currency?: unknown; timezone?: unknown };
+      const savedTimeZone = TimezoneSchema.safeParse(saved.timezone);
+      // Both fields go to the provider, which validates each one. If the
+      // response omits the zone, keep the zone this request just saved.
+      updateSettings(
+        {
+          currency: saved.currency,
+          timezone: savedTimeZone.success ? savedTimeZone.data : parsedTimeZone.data,
+        },
+        targetBusinessId,
+      );
+
+      resetDraftState();
       router.replace('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -407,11 +493,10 @@ function StepTwo({
       </Field>
 
       <Field label="Country" htmlFor="country">
-        <Input
+        <CountrySelect
           id="country"
-          type="text"
           value={form.address.country}
-          onChange={(e) => handleAddressChange('country', e.target.value)}
+          onChange={(country) => handleAddressChange('country', country)}
         />
       </Field>
 
@@ -448,9 +533,26 @@ function StepThree({
     scheduleDraftSave('currency', value);
   };
 
+  const [timeZoneError, setTimeZoneError] = useState<string | null>(null);
+
+  const handleTimeZoneChange = (value: string) => {
+    setForm({ ...form, timezone: value });
+    scheduleDraftSave('timezone', value);
+    setTimeZoneError(null);
+  };
+
+  const continueWithTimeZone = () => {
+    const parsed = TimezoneSchema.safeParse(form.timezone);
+    if (!parsed.success) {
+      setTimeZoneError('Choose a valid timezone.');
+      return;
+    }
+    onNext();
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-ink">Your currency and logo</h1>
+      <h1 className="text-2xl font-semibold text-ink">Your currency, timezone, and logo</h1>
       <p className="text-sm text-body">
         This is how your customers will see prices and identify your business.
       </p>
@@ -466,6 +568,15 @@ function StepThree({
           <option value="EUR">EUR - Euro</option>
           <option value="GBP">GBP - British Pound</option>
         </Select>
+      </Field>
+
+      <Field
+        label="Timezone"
+        htmlFor="timezone"
+        description="Used for delivery deadlines and timestamps."
+        error={timeZoneError ?? undefined}
+      >
+        <TimezoneSelect id="timezone" value={form.timezone} onChange={handleTimeZoneChange} />
       </Field>
 
       <Field label="Business logo" htmlFor="logo-upload" description="JPEG, PNG, or WebP. Max 5MB.">
@@ -504,7 +615,7 @@ function StepThree({
         <Button variant="secondary" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={onNext}>Continue</Button>
+        <Button onClick={continueWithTimeZone}>Continue</Button>
       </div>
     </div>
   );
@@ -546,7 +657,9 @@ function StepFour({
           )}
           <div>
             <p className="font-semibold text-ink">{form.name || 'Unnamed business'}</p>
-            <p className="text-sm text-muted">{form.currency}</p>
+            <p className="text-sm text-muted">
+              {form.currency} · {form.timezone}
+            </p>
           </div>
         </div>
 

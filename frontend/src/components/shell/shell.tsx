@@ -26,6 +26,8 @@ import {
   StatusPill,
 } from '@/components/ui/primitives';
 import { ThemeToggle } from '@/components/theme/theme';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { formatBusinessDayLabel, todayInTimeZone } from '@/lib/timezone';
 
 type RouteItem = {
   href: string;
@@ -89,10 +91,17 @@ function MoreMenu({ pathname, onClose }: { pathname: string; onClose: () => void
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { currency, timezone, mounted } = useBusinessSettings();
+  const businessDay = mounted ? todayInTimeZone(timezone) : null;
+  const businessDayLabel = mounted ? formatBusinessDayLabel(timezone) : null;
+  const badgeLabel = currency ? `${timezone} · ${currency}` : timezone;
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-border bg-surface px-5 py-6 lg:flex">
+      <aside
+        aria-label="Sidebar"
+        className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-border bg-surface px-5 py-6 lg:flex"
+      >
         <div className="mb-10 flex items-center gap-3 px-3">
           <span className="grid size-10 place-items-center rounded-md bg-ink text-on-ink">
             <Boxes aria-hidden="true" size={20} />
@@ -125,34 +134,44 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <ThemeToggle />
           </div>
-          <Badge>Bangladesh · BDT</Badge>
+          <Badge>{badgeLabel}</Badge>
         </div>
       </aside>
 
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 border-b border-border bg-canvas/95 backdrop-blur">
-          <div className="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
-            <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-md bg-ink text-on-ink lg:hidden">
-                <Boxes aria-hidden="true" size={18} />
-              </span>
-              <div>
-                <p className="font-mono text-[0.7rem] uppercase tracking-widest text-sky-strong">
-                  Tuesday, 9 September
-                </p>
-                <h1 className="text-lg font-semibold text-ink">Good morning, Maya</h1>
+          <div className="px-3 py-3 sm:px-6 lg:px-10 lg:py-0">
+            <div className="lg:flex lg:min-h-16 lg:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-md bg-ink text-on-ink lg:hidden">
+                    <Boxes aria-hidden="true" size={18} />
+                  </span>
+                  <p className="min-h-4 min-w-0 whitespace-nowrap font-mono text-[0.65rem] uppercase tracking-wide text-sky-strong">
+                    {businessDay && businessDayLabel ? (
+                      <time dateTime={businessDay}>{businessDayLabel}</time>
+                    ) : null}
+                  </p>
+                  <div className="ml-auto flex shrink-0 items-center gap-2 lg:hidden">
+                    <ThemeToggle />
+                    <button
+                      aria-label="Open navigation"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky"
+                      onClick={() => setMoreOpen(true)}
+                      type="button"
+                    >
+                      <Menu aria-hidden="true" size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-2 pl-11 lg:mt-0 lg:pl-0">
+                  <Badge className="whitespace-nowrap lg:hidden">{badgeLabel}</Badge>
+                  <h1 className="mt-2 text-lg font-semibold text-ink lg:mt-1">
+                    Good morning, Maya
+                  </h1>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 lg:hidden">
-              <ThemeToggle />
-              <button
-                aria-label="Open navigation"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border bg-surface text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky"
-                onClick={() => setMoreOpen(true)}
-                type="button"
-              >
-                <Menu aria-hidden="true" size={18} />
-              </button>
             </div>
           </div>
         </header>

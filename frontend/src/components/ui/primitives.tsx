@@ -303,6 +303,15 @@ function useOverlay(onClose: () => void, open: boolean) {
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
+
+      // A backdrop click can leave focus on the body. Pull it back into the
+      // dialog instead of letting the next Tab reach the page behind it.
+      if (!active || !root.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
+
       if (event.shiftKey) {
         if (active === first || active === root) {
           event.preventDefault();

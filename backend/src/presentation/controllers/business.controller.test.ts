@@ -30,6 +30,7 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
     id: 'biz1',
     name: 'Test Co',
     currency: 'BDT',
+    timezone: 'Asia/Dhaka',
     logoUrl: undefined,
     address: undefined,
     onboardingComplete: false,
@@ -98,6 +99,7 @@ describe('Business Service Integration Tests', () => {
       const result = await businessService.completeOnboarding('biz1', {
         name: 'My Business',
         currency: 'USD' as Currency,
+        timezone: 'Asia/Dhaka',
         address: VALID_ADDRESS,
         logoUrl, // Include the already-uploaded logo
       });

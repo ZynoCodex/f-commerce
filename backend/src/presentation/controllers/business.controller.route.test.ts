@@ -148,6 +148,7 @@ describe('Business Controller - Onboarding Gate', () => {
       id: 'biz-target',
       name: 'New Biz',
       currency: 'USD',
+      timezone: 'Asia/Dhaka',
       address: { street: '1 St', city: 'City', country: 'US' },
       onboardingComplete: true,
     });
@@ -160,6 +161,7 @@ describe('Business Controller - Onboarding Gate', () => {
       .send({
         name: 'New Biz',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 St', city: 'City', country: 'US' },
       });
 
@@ -208,6 +210,7 @@ describe('Business Controller - GET /me', () => {
       id: 'biz-target',
       name: 'Maya Traders',
       currency: 'USD',
+      timezone: 'Asia/Dhaka',
       logoUrl: 'https://cdn.example.com/logo.png',
       address: { street: '1 Main St', city: 'Dhaka', country: 'Bangladesh' },
       onboardingComplete: true,
@@ -222,6 +225,7 @@ describe('Business Controller - GET /me', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.name).toBe('Maya Traders');
     expect(res.body.data.currency).toBe('USD');
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
     expect(res.body.data.onboardingComplete).toBe(true);
     expect(res.body.data.logoUrl).toBe('https://cdn.example.com/logo.png');
     expect(res.body.data.address).toEqual({
@@ -238,6 +242,7 @@ describe('Business Controller - GET /me', () => {
       id: 'biz-target',
       name: 'No Logo Biz',
       currency: 'BDT',
+      timezone: 'Asia/Dhaka',
       logoUrl: undefined,
       address: { street: '1 St', city: 'City', country: 'BD' },
       onboardingComplete: true,
@@ -263,7 +268,8 @@ describe('Business Controller - GET /me', () => {
       id: 'biz-target',
       name: '',
       currency: 'BDT',
-      logoUrl: '',
+      timezone: 'Asia/Dhaka',
+      logoUrl: undefined,
       address: null,
       onboardingComplete: false,
       onboardingDraft: draft,
@@ -294,6 +300,61 @@ describe('Business Controller - GET /me', () => {
   });
 });
 
+describe('Business Controller - GET /onboarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getBusinessMock.mockReset();
+    updateBusinessMock.mockReset();
+    saveDraftMock.mockReset();
+    completeOnboardingMock.mockReset();
+    uploadLogoMock.mockReset();
+  });
+
+  // covers AC-3: the wizard reads the stored timezone and the draft timezone.
+  it('returns the stored timezone and the draft timezone', async () => {
+    getBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Draft Co',
+      currency: 'BDT',
+      timezone: 'Europe/London',
+      logoUrl: null,
+      address: null,
+      onboardingComplete: false,
+      onboardingDraft: { timezone: 'America/New_York' },
+    });
+
+    const res = await request(app)
+      .get('/api/business/onboarding')
+      .set('x-business-id', 'biz-target');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.timezone).toBe('Europe/London');
+    expect(res.body.data.onboardingDraft).toEqual({ timezone: 'America/New_York' });
+  });
+
+  // covers AC-3: a missing draft reads as null, not undefined.
+  it('returns null for the draft when the business has none', async () => {
+    getBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Fresh Co',
+      currency: 'BDT',
+      timezone: 'Asia/Dhaka',
+      logoUrl: null,
+      address: null,
+      onboardingComplete: false,
+      onboardingDraft: undefined,
+    });
+
+    const res = await request(app)
+      .get('/api/business/onboarding')
+      .set('x-business-id', 'biz-target');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
+    expect(res.body.data.onboardingDraft).toBeNull();
+  });
+});
+
 describe('Business Controller - PUT /me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -318,6 +379,7 @@ describe('Business Controller - PUT /me', () => {
       id: 'biz-target',
       name: 'Updated Name',
       currency: 'USD',
+      timezone: 'Asia/Dhaka',
       logoUrl: null,
       address: { street: '1 St', city: 'City', country: 'US' },
       onboardingComplete: true,
@@ -333,6 +395,7 @@ describe('Business Controller - PUT /me', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.name).toBe('Updated Name');
     expect(res.body.data.currency).toBe('USD');
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
     expect(res.body.message).toBe('Business profile updated');
     expect(updateBusinessMock).toHaveBeenCalledWith('biz-target', {
       name: 'Updated Name',
@@ -369,6 +432,7 @@ describe('Business Controller - PUT /me', () => {
       id: 'biz-target',
       name: 'Existing Biz',
       currency: 'EUR',
+      timezone: 'Asia/Dhaka',
       onboardingComplete: true,
     });
 
@@ -392,6 +456,59 @@ describe('Business Controller - PUT /me', () => {
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Business not found');
   });
+
+  it('accepts a timezone update and returns the canonical stored value', async () => {
+    updateBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Existing Biz',
+      currency: 'BDT',
+      timezone: 'Asia/Dhaka',
+      onboardingComplete: true,
+    });
+
+    const res = await request(app)
+      .put('/api/business/me')
+      .set('x-business-id', 'biz-target')
+      .send({ timezone: 'asia/dhaka' });
+
+    expect(res.status).toBe(200);
+    expect(updateBusinessMock).toHaveBeenCalledWith('biz-target', { timezone: 'Asia/Dhaka' });
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
+  });
+
+  it('stores an IANA alias in the canonical form the runtime reports', async () => {
+    const canonical = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Calcutta',
+    }).resolvedOptions().timeZone;
+
+    updateBusinessMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Existing Biz',
+      currency: 'BDT',
+      timezone: canonical,
+      onboardingComplete: true,
+    });
+
+    const res = await request(app)
+      .put('/api/business/me')
+      .set('x-business-id', 'biz-target')
+      .send({ timezone: 'Asia/Calcutta' });
+
+    expect(res.status).toBe(200);
+    expect(updateBusinessMock).toHaveBeenCalledWith('biz-target', { timezone: canonical });
+    expect(res.body.data.timezone).toBe(canonical);
+  });
+
+  it('returns 400 for an invalid timezone and writes nothing', async () => {
+    const res = await request(app)
+      .put('/api/business/me')
+      .set('x-business-id', 'biz-target')
+      .send({ timezone: 'Mars/Olympus' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid input');
+    expect(updateBusinessMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('Business Controller - PUT /onboarding', () => {
@@ -410,6 +527,7 @@ describe('Business Controller - PUT /onboarding', () => {
       id: 'biz-target',
       name: 'Final Biz',
       currency: 'USD',
+      timezone: 'Asia/Dhaka',
       logoUrl: 'https://cdn.example.com/logo.png',
       address: { street: '1 Main', city: 'Dhaka', country: 'Bangladesh' },
       onboardingComplete: true,
@@ -421,6 +539,7 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: 'Final Biz',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 Main', city: 'Dhaka', country: 'Bangladesh' },
         logoUrl: 'https://cdn.example.com/logo.png',
       });
@@ -429,13 +548,43 @@ describe('Business Controller - PUT /onboarding', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.onboardingComplete).toBe(true);
     expect(res.body.data.name).toBe('Final Biz');
+    expect(res.body.data.timezone).toBe('Asia/Dhaka');
     expect(res.body.message).toBe('Onboarding completed');
     expect(completeOnboardingMock).toHaveBeenCalledWith('biz-target', {
       name: 'Final Biz',
       currency: 'USD',
+      timezone: 'Asia/Dhaka',
       address: { street: '1 Main', city: 'Dhaka', country: 'Bangladesh' },
       logoUrl: 'https://cdn.example.com/logo.png',
     });
+  });
+
+  it('canonicalizes the timezone before completing onboarding', async () => {
+    completeOnboardingMock.mockResolvedValueOnce({
+      id: 'biz-target',
+      name: 'Final Biz',
+      currency: 'USD',
+      timezone: 'Asia/Dhaka',
+      logoUrl: null,
+      address: { street: '1 Main', city: 'Dhaka', country: 'Bangladesh' },
+      onboardingComplete: true,
+    });
+
+    const res = await request(app)
+      .put('/api/business/onboarding')
+      .set('x-business-id', 'biz-target')
+      .send({
+        name: 'Final Biz',
+        currency: 'USD',
+        timezone: 'asia/dhaka',
+        address: { street: '1 Main', city: 'Dhaka', country: 'Bangladesh' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(completeOnboardingMock).toHaveBeenCalledWith(
+      'biz-target',
+      expect.objectContaining({ timezone: 'Asia/Dhaka' }),
+    );
   });
 
   // covers AC-2: Zod rejects missing address at the boundary
@@ -443,11 +592,42 @@ describe('Business Controller - PUT /onboarding', () => {
     const res = await request(app)
       .put('/api/business/onboarding')
       .set('x-business-id', 'biz-target')
-      .send({ name: 'Biz', currency: 'USD' });
+      .send({ name: 'Biz', currency: 'USD', timezone: 'Asia/Dhaka' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid input');
     expect(res.body.details).toBeDefined();
+    expect(completeOnboardingMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when timezone is missing', async () => {
+    const res = await request(app)
+      .put('/api/business/onboarding')
+      .set('x-business-id', 'biz-target')
+      .send({
+        name: 'Biz',
+        currency: 'USD',
+        address: { street: '1 St', city: 'City', country: 'US' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid input');
+    expect(completeOnboardingMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when timezone is invalid', async () => {
+    const res = await request(app)
+      .put('/api/business/onboarding')
+      .set('x-business-id', 'biz-target')
+      .send({
+        name: 'Biz',
+        currency: 'USD',
+        timezone: 'Mars/Olympus',
+        address: { street: '1 St', city: 'City', country: 'US' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid input');
     expect(completeOnboardingMock).not.toHaveBeenCalled();
   });
 
@@ -459,6 +639,7 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: 'Biz',
         currency: 'JPY',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 St', city: 'City', country: 'JP' },
       });
 
@@ -474,6 +655,7 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: '',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 St', city: 'City', country: 'US' },
       });
 
@@ -489,6 +671,7 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: 'Biz',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 St', country: 'US' },
       });
 
@@ -506,6 +689,7 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: 'Biz',
         currency: 'USD',
+        timezone: 'Asia/Dhaka',
         address: { street: '1 St', city: 'City', country: 'US' },
       });
 
@@ -518,6 +702,7 @@ describe('Business Controller - PUT /onboarding', () => {
       id: 'biz-target',
       name: 'No Logo Biz',
       currency: 'EUR',
+      timezone: 'Europe/Berlin',
       logoUrl: null,
       address: { street: '1 St', city: 'City', country: 'DE' },
       onboardingComplete: true,
@@ -529,11 +714,13 @@ describe('Business Controller - PUT /onboarding', () => {
       .send({
         name: 'No Logo Biz',
         currency: 'EUR',
+        timezone: 'Europe/Berlin',
         address: { street: '1 St', city: 'City', country: 'DE' },
       });
 
     expect(res.status).toBe(200);
     expect(res.body.data.onboardingComplete).toBe(true);
+    expect(res.body.data.timezone).toBe('Europe/Berlin');
   });
 });
 
@@ -549,7 +736,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
 
   // covers AC-1: wizard resume saves draft progress
   it('returns 200 on successful draft save for name field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -563,7 +750,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('returns 200 on successful draft save for currency field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -574,8 +761,31 @@ describe('Business Controller - PUT /onboarding/draft', () => {
     expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'currency', 'GBP');
   });
 
+  it('saves the timezone draft in canonical form', async () => {
+    saveDraftMock.mockResolvedValueOnce(true);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'asia/dhaka' });
+
+    expect(res.status).toBe(200);
+    expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'timezone', 'Asia/Dhaka');
+  });
+
+  it('returns 400 when the timezone draft value is invalid', async () => {
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'Mars/Olympus' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid input');
+    expect(saveDraftMock).not.toHaveBeenCalled();
+  });
+
   it('returns 200 on successful draft save for address field', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
     const address = { street: '1 St', city: 'Dhaka', country: 'Bangladesh' };
 
     const res = await request(app)
@@ -642,7 +852,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('accepts an incomplete address draft with empty strings', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -671,7 +881,7 @@ describe('Business Controller - PUT /onboarding/draft', () => {
   });
 
   it('accepts an empty string for logoUrl (clearing the logo)', async () => {
-    saveDraftMock.mockResolvedValueOnce(undefined);
+    saveDraftMock.mockResolvedValueOnce(true);
 
     const res = await request(app)
       .put('/api/business/onboarding/draft')
@@ -680,6 +890,34 @@ describe('Business Controller - PUT /onboarding/draft', () => {
 
     expect(res.status).toBe(200);
     expect(saveDraftMock).toHaveBeenCalledWith('biz-target', 'logoUrl', '');
+  });
+
+  it('returns 409 instead of claiming a save when onboarding already completed', async () => {
+    // The repository skips the write once onboarding finishes; the route must
+    // not answer 200 for a draft it never stored.
+    saveDraftMock.mockResolvedValueOnce(false);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'Pacific/Apia' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('ONBOARDING_COMPLETE');
+    expect(res.body.message).toMatch(/no draft to save/i);
+    expect(res.body.success).toBeUndefined();
+  });
+
+  it('returns 200 only when the service reports the draft was written', async () => {
+    saveDraftMock.mockResolvedValueOnce(true);
+
+    const res = await request(app)
+      .put('/api/business/onboarding/draft')
+      .set('x-business-id', 'biz-target')
+      .send({ field: 'timezone', value: 'Pacific/Apia' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, message: 'Draft saved' });
   });
 
   it('returns 500 when the service throws an error without leaking its message', async () => {

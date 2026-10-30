@@ -1,18 +1,38 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button, Field, FormMessage, Input } from '@/components/ui/primitives';
 import { apiFetch, setAuth } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 
-export default function LoginPage() {
-  const router = useRouter();
+/**
+ * Ask the API where this member belongs after signing in. A completed business
+ * goes straight to the order desk; an unfinished one goes to the wizard.
+ *
+ * Falls back to the wizard when the profile cannot be read, so a failed check
+ * never hides onboarding from someone who has not finished it.
+ */
+async function landingPath(): Promise<'/dashboard' | '/onboarding'> {
+  try {
+    const res = await apiFetch('/api/business/me', { method: 'GET' });
+    // A 403 with `error: "Onboarding required"` is the normal unfinished
+    // case; any other failure also opens the wizard, which resolves the truth
+    // for itself.
+    if (!res.ok) return '/onboarding';
 
+    const payload: unknown = await res.json();
+    const data = (payload as { data?: { onboardingComplete?: unknown } }).data;
+    return data?.onboardingComplete === true ? '/dashboard' : '/onboarding';
+  } catch {
+    return '/onboarding';
+  }
+}
+
+export default function LoginPage() {
   // Authenticated users shouldn't see the sign-in / register form.
   // Note: all hooks below must stay unconditional so hook order is stable
   // across the ready/not-ready renders.
-  const ready = useRequireAuth({ requireAuth: false });
+  const ready = useRequireAuth({ requireAuth: false, redirectTo: landingPath });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -63,7 +83,8 @@ export default function LoginPage() {
       if (!businessId) throw new Error('No business association found');
 
       setAuth({ accessToken: token, businessId });
-      router.replace('/onboarding');
+      // Setting the session is enough: the route guard owns the redirect and
+      // resolves the destination once, so the wizard cannot flash first.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

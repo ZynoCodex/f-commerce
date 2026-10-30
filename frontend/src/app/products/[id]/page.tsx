@@ -24,13 +24,13 @@ import {
 } from '@/components/ui/primitives';
 import { ProductFields } from '@/components/catalog/product-form';
 import { StockBadge } from '@/components/catalog/stock-badge';
+import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import {
   CatalogApiError,
   archiveProduct,
   deleteProduct,
-  getBusinessCurrency,
   getProduct,
   removeProductImage,
   restoreProduct,
@@ -134,6 +134,7 @@ export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
+  const { currency, timezone } = useBusinessSettings();
 
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,7 +143,6 @@ export default function ProductDetailPage() {
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [currency, setCurrency] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<'archive' | 'restore' | null>(null);
@@ -211,21 +211,6 @@ export default function ProductDetailPage() {
       })
       .catch((error: unknown) => {
         if (!cancelled) setCategoryError(catalogMessage(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    getBusinessCurrency()
-      .then((next) => {
-        if (!cancelled) setCurrency(next);
-      })
-      .catch(() => {
-        // The page still reads with bare numbers.
       });
 
     return () => {
@@ -800,7 +785,7 @@ export default function ProductDetailPage() {
               </div>
               <div>
                 <dt className="text-muted">Updated</dt>
-                <dd className="mt-1 text-ink">{formatDateTime(product.updatedAt)}</dd>
+                <dd className="mt-1 text-ink">{formatDateTime(product.updatedAt, timezone)}</dd>
               </div>
             </dl>
           </Card>
