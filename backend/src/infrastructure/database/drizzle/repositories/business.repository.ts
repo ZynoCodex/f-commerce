@@ -11,7 +11,7 @@ function toBusiness(row: typeof businesses.$inferSelect): Business {
     name: row.name,
     currency: row.currency as Business['currency'],
     timezone: row.timezone,
-    logoUrl: row.logoUrl ?? undefined,
+    logoUrl: row.logoUrl || undefined,
     address: row.address ?? undefined,
     onboardingComplete: row.onboardingComplete,
     onboardingDraft: row.onboardingDraft ?? undefined,
@@ -46,7 +46,7 @@ export class DrizzleBusinessRepository implements IBusinessRepository {
     if (data.name !== undefined) changes.name = data.name;
     if (data.currency !== undefined) changes.currency = data.currency;
     if (data.timezone !== undefined) changes.timezone = data.timezone;
-    if (data.logoUrl !== undefined) changes.logoUrl = data.logoUrl;
+    if (data.logoUrl !== undefined) changes.logoUrl = data.logoUrl || null;
     if (data.address !== undefined) changes.address = data.address;
     if (data.onboardingComplete !== undefined) changes.onboardingComplete = data.onboardingComplete;
     if (data.onboardingDraft !== undefined) changes.onboardingDraft = data.onboardingDraft;

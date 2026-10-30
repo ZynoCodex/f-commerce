@@ -18,31 +18,32 @@ export function businessSettingsCacheKey(businessId: string): string {
   return `${CACHE_PREFIX}${businessId}`;
 }
 
-function parseBusinessSettingsCache(
-  businessId: string,
-  raw: string | null,
-): CachedBusinessSettings | null {
+function parseBusinessSettingsCache(raw: string | null): CachedBusinessSettings | null {
   if (!raw) return null;
 
-  const parsed: unknown = JSON.parse(raw);
-  if (!parsed || typeof parsed !== 'object') {
-    removeBusinessSettingsCache(businessId);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
     return null;
   }
+
+  if (!parsed || typeof parsed !== 'object') return null;
 
   const record = parsed as Record<string, unknown>;
   const currency = CurrencyEnum.safeParse(record.currency);
   const timezone = TimezoneSchema.safeParse(record.timezone);
 
-  if (!currency.success || !timezone.success) {
-    removeBusinessSettingsCache(businessId);
-    return null;
-  }
+  if (!currency.success || !timezone.success) return null;
 
   return { currency: currency.data, timezone: timezone.data };
 }
 
-/** Read and validate one business's cached settings. A bad entry is removed. */
+/**
+ * Read and validate one business's cached settings without touching storage.
+ * The provider calls this during render, so a malformed entry is ignored here
+ * and pruned later by {@link pruneBusinessSettingsCache}.
+ */
 export function readBusinessSettingsCache(businessId: string): CachedBusinessSettings | null {
   if (typeof window === 'undefined') return null;
 
@@ -51,13 +52,25 @@ export function readBusinessSettingsCache(businessId: string): CachedBusinessSet
     const key = `${businessId}|${raw ?? ''}`;
     if (lastRead?.key === key) return lastRead.value;
 
-    const value = parseBusinessSettingsCache(businessId, raw);
+    const value = parseBusinessSettingsCache(raw);
     lastRead = { key, value };
     return value;
   } catch {
-    removeBusinessSettingsCache(businessId);
-    lastRead = null;
     return null;
+  }
+}
+
+/** Remove an unreadable cache entry after render, never during it. */
+export function pruneBusinessSettingsCache(businessId: string): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const raw = window.localStorage.getItem(businessSettingsCacheKey(businessId));
+    if (raw !== null && parseBusinessSettingsCache(raw) === null) {
+      removeBusinessSettingsCache(businessId);
+    }
+  } catch {
+    // Storage can be unavailable; there is nothing to prune then.
   }
 }
 

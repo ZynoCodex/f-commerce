@@ -7,7 +7,9 @@ import { AppShell } from '@/components/shell/shell';
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import { useBusinessSettings } from '@/components/business/business-settings-provider';
+import { CountrySelect } from '@/components/business/country-select';
 import { TimezoneSelect } from '@/components/business/timezone-select';
+import { DEFAULT_COUNTRY, countryForTimeZone } from '@/lib/countries';
 import { DEFAULT_TIME_ZONE } from '@/lib/timezone';
 import { TimezoneSchema, type BusinessProfile } from '@f-commerce/contracts';
 
@@ -50,13 +52,12 @@ export default function SettingsPage() {
       city: '',
       region: '',
       postalCode: '',
-      country: 'Bangladesh',
+      country: DEFAULT_COUNTRY,
     } as Address,
   });
 
   useEffect(() => {
     let cancelled = false;
-    void cancelled;
 
     apiFetch('/api/business/me')
       .then(async (res) => {
@@ -91,7 +92,7 @@ export default function SettingsPage() {
                   city: '',
                   region: '',
                   postalCode: '',
-                  country: 'Bangladesh',
+                  country: countryForTimeZone(timezone) ?? DEFAULT_COUNTRY,
                 },
           });
         }
@@ -307,13 +308,10 @@ export default function SettingsPage() {
           </Field>
 
           <Field label="Country" htmlFor="country">
-            <Input
+            <CountrySelect
               id="country"
-              type="text"
               value={form.address.country}
-              onChange={(e) =>
-                setForm({ ...form, address: { ...form.address, country: e.target.value } })
-              }
+              onChange={(country) => setForm({ ...form, address: { ...form.address, country } })}
             />
           </Field>
 

@@ -22,7 +22,7 @@ import { AppShell } from '@/components/shell/shell';
 import { useBusinessSettings } from '@/components/business/business-settings-provider';
 import { apiFetch, isTimeoutError } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
-import { formatDateTime } from '@/lib/catalog-format';
+import { formatDateTime, formatMoney } from '@/lib/catalog-format';
 import type { CustomerOrderDto, CustomerProfileDto } from '@f-commerce/contracts';
 
 const PAGE_SIZE = 20;
@@ -38,14 +38,6 @@ interface EditForm {
   email: string;
   address: string;
   notes: string;
-}
-
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
-  } catch {
-    return `${currency} ${amount.toFixed(2)}`;
-  }
 }
 
 export default function CustomerProfilePage() {

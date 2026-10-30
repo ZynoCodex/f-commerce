@@ -120,7 +120,7 @@ export class DrizzleAuthRepository implements IAuthRepository {
         _id: row.businessId,
         name: row.businessName,
         currency: row.currency,
-        logoUrl: row.logoUrl,
+        logoUrl: row.logoUrl || null,
         address: row.address,
         onboardingComplete: row.onboardingComplete,
         createdAt: row.createdAt,

@@ -7,9 +7,11 @@ import { Button, Field, FormMessage, Input, Select } from '@/components/ui/primi
 import { apiFetch } from '@/lib/auth-client';
 import { useRequireAuth } from '@/lib/auth-guard';
 import { useBusinessSettings } from '@/components/business/business-settings-provider';
-import { TimezoneSelect, browserTimeZone } from '@/components/business/timezone-select';
-import { DEFAULT_TIME_ZONE } from '@/lib/timezone';
-import { TimezoneSchema, type BusinessProfile } from '@f-commerce/contracts';
+import { CountrySelect } from '@/components/business/country-select';
+import { TimezoneSelect } from '@/components/business/timezone-select';
+import { DEFAULT_COUNTRY, browserCountry, countryForTimeZone } from '@/lib/countries';
+import { DEFAULT_TIME_ZONE, browserTimeZone } from '@/lib/timezone';
+import { TimezoneSchema, type BusinessProfile, type OnboardingDraft } from '@f-commerce/contracts';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -103,7 +105,11 @@ type BusinessData = {
   logoUrl: string | null;
   address: Address | null;
   onboardingComplete: boolean;
-  onboardingDraft?: OnboardingForm | null;
+  /**
+   * Partial wizard progress, so every field is optional: a draft saved after
+   * step one has no address yet.
+   */
+  onboardingDraft?: OnboardingDraft | null;
 };
 
 export default function OnboardingPage() {
@@ -131,14 +137,13 @@ export default function OnboardingPage() {
       city: '',
       region: '',
       postalCode: '',
-      country: 'Bangladesh',
+      country: DEFAULT_COUNTRY,
     },
     logoUrl: '',
   });
 
   useEffect(() => {
     let cancelled = false;
-    void cancelled;
 
     // Drop any draft state from a previous business or mount.
     resetDraftState();
@@ -149,7 +154,7 @@ export default function OnboardingPage() {
       .then(async (res) => {
         if (res.status === 403 && res.headers.get('content-type')?.includes('json')) {
           return res.json().then(async (data) => {
-            if (data.error?.includes('Onboarding') || data.message?.includes('Onboarding')) {
+            if (data.error === 'Onboarding required') {
               const onboardingRes = await apiFetch('/api/business/onboarding', { method: 'GET' });
               if (!onboardingRes.ok) throw new Error('Failed to load onboarding');
               return onboardingRes.json();
@@ -178,7 +183,19 @@ export default function OnboardingPage() {
               'BDT') as BusinessProfile['currency'];
             const draftTimeZone = TimezoneSchema.safeParse(draft.timezone);
             const timezone = draftTimeZone.success ? draftTimeZone.data : browserTimeZone();
-            const address = draft.address || data.data.address || form.address;
+            const savedAddress = draft.address || data.data.address;
+            // A draft saved before the address step has no country yet. Follow
+            // the timezone the seller would see, not the default country.
+            const address: Address = savedAddress
+              ? {
+                  ...savedAddress,
+                  country:
+                    savedAddress.country || (countryForTimeZone(timezone) ?? DEFAULT_COUNTRY),
+                }
+              : {
+                  ...form.address,
+                  country: countryForTimeZone(timezone) ?? DEFAULT_COUNTRY,
+                };
             const logoUrl = draft.logoUrl || data.data.logoUrl || '';
 
             setForm({
@@ -198,8 +215,16 @@ export default function OnboardingPage() {
               setLogoPreview(draft.logoUrl || data.data.logoUrl || null);
             }
           } else {
-            // No draft yet — pre-fill the name and the browser zone.
-            setForm((prev) => ({ ...prev, name: businessName, timezone: browserTimeZone() }));
+            // No draft yet — pre-fill the name, the device's country, and zone.
+            setForm((prev) => ({
+              ...prev,
+              name: businessName,
+              timezone: browserTimeZone(),
+              address: {
+                ...prev.address,
+                country: data.data.address?.country || browserCountry(),
+              },
+            }));
           }
         }
       })
@@ -217,6 +242,9 @@ export default function OnboardingPage() {
       // Drop the pending save and the cache on unmount.
       resetDraftState();
     };
+    // Load once per mount: this reads the saved profile and seeds the form, so a
+    // re-run on every render of the router or the draft helpers would overwrite
+    // what the seller has typed.
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) return <div className="p-8">Loading your profile...</div>;
@@ -465,11 +493,10 @@ function StepTwo({
       </Field>
 
       <Field label="Country" htmlFor="country">
-        <Input
+        <CountrySelect
           id="country"
-          type="text"
           value={form.address.country}
-          onChange={(e) => handleAddressChange('country', e.target.value)}
+          onChange={(country) => handleAddressChange('country', country)}
         />
       </Field>
 

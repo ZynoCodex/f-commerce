@@ -1,29 +1,15 @@
+import { resolveTimeZone } from '@f-commerce/contracts';
+
 export const DEFAULT_TIME_ZONE = 'Asia/Dhaka';
 
 /**
- * A bare `UTC` or an `Area/Location` style IANA ID. This rejects fixed offsets
- * such as `+06:00` and abbreviations such as `BST`, both of which the runtime
- * would otherwise accept as legacy aliases.
- */
-const IANA_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)+$/;
-
-/**
- * True only for an IANA timezone ID the runtime accepts. Fixed offsets and
- * abbreviations do not survive daylight saving changes, so they are rejected.
+ * True only for a bare `UTC` or an `Area/Location` IANA ID. Fixed offsets such
+ * as `+06:00` and abbreviations such as `BST` are rejected, because they do not
+ * survive daylight saving changes. This is the same rule the contracts schema
+ * enforces, so a value accepted here is a value the API accepts too.
  */
 export function isValidTimeZone(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-
-  const zone = value.trim();
-  if (zone.length === 0 || zone.length > 64) return false;
-  if (zone !== 'UTC' && !IANA_ID_PATTERN.test(zone)) return false;
-
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
+  return typeof value === 'string' && resolveTimeZone(value) !== null;
 }
 
 /**

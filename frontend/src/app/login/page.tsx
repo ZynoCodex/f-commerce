@@ -15,8 +15,9 @@ import { useRequireAuth } from '@/lib/auth-guard';
 async function landingPath(): Promise<'/dashboard' | '/onboarding'> {
   try {
     const res = await apiFetch('/api/business/me', { method: 'GET' });
-    // A 403 ONBOARDING_REQUIRED is the normal unfinished case; any other
-    // failure also opens the wizard, which resolves the truth for itself.
+    // A 403 with `error: "Onboarding required"` is the normal unfinished
+    // case; any other failure also opens the wizard, which resolves the truth
+    // for itself.
     if (!res.ok) return '/onboarding';
 
     const payload: unknown = await res.json();

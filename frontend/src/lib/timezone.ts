@@ -34,6 +34,16 @@ export function normalizeTimeZone(value: string): string {
   return resolveCached(value) ?? DEFAULT_TIME_ZONE;
 }
 
+/** The browser's zone when it is usable, otherwise the business fallback. */
+export function browserTimeZone(): string {
+  try {
+    const zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidTimeZone(zone) ? zone : DEFAULT_TIME_ZONE;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
 /**
  * One formatter per zone and option set. A formatter is stateless and applies
  * daylight saving at format time, so reuse is safe. Keyed by the current Intl

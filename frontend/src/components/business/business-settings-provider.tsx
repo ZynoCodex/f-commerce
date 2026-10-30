@@ -11,6 +11,7 @@ import {
 import { CurrencyEnum, TimezoneSchema } from '@f-commerce/contracts';
 import { apiFetch, getAuth, subscribeToAuth } from '@/lib/auth-client';
 import {
+  pruneBusinessSettingsCache,
   readBusinessSettingsCache,
   writeBusinessSettingsCache,
 } from '@/lib/business-settings-cache';
@@ -186,6 +187,10 @@ export function BusinessSettingsProvider({ children }: { children: React.ReactNo
 
   useEffect(() => {
     if (businessId === '') return;
+
+    // The render path only reads the cache. Clear a malformed entry after the
+    // commit, where a storage write is allowed.
+    pruneBusinessSettingsCache(businessId);
 
     let cancelled = false;
 

@@ -17,16 +17,6 @@ const FALLBACK_TIME_ZONES = [
   'UTC',
 ];
 
-/** The browser's zone when it is usable, otherwise the business fallback. */
-export function browserTimeZone(): string {
-  try {
-    const zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return isValidTimeZone(zone) ? zone : DEFAULT_TIME_ZONE;
-  } catch {
-    return DEFAULT_TIME_ZONE;
-  }
-}
-
 /** The runtime list, or the short list when enumeration is unavailable. */
 export function supportedTimeZones(): string[] {
   const supportedValuesOf = (
