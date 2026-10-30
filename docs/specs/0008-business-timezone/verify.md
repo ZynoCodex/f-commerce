@@ -27,6 +27,8 @@ _Steps derived from spec 0008 acceptance criteria. `/check verify` runs these; `
 
 _Items 25 and 26 were exercised with harness help. The built page does not expose `clearAuth` and has no sign out control, so the real function was exposed from the served chunk at runtime and called; the previous cache was removed and the next business showed its own settings. The accessibility checks used the keyboard and the browser accessibility tree, which is the tree a screen reader reads; live screen reader speech was not captured._
 
+_Re-checked 2026-10-31 after the logo fix. The live `businesses` table has `timezone` as not null text with the `Asia/Dhaka` default, and `orders.delivery_deadline` is still a nullable date. A wizard completed through the browser with no logo reached the dashboard, the review step showed `BDT · Asia/Dhaka`, and Settings showed the zone field with no image and no empty source. `PUT /api/business/onboarding` sent the `logoUrl: ""` the form sends, and the profile read, the settings read, and the `GET /api/auth/me` payload all answered `logoUrl: null`. A URL still reads back as itself, and clearing it reads back as `null` again. These checks were driven with a scratch Playwright script and API calls, not saved._
+
 ## API / runtime
 
 - [x] Run the migration on a database with an existing business → the `businesses.timezone` column exists, is `text`, is not null, defaults to `Asia/Dhaka`, and every existing row reads `Asia/Dhaka` → AC-1, AC-4
@@ -53,9 +55,12 @@ _Items 25 and 26 were exercised with harness help. The built page does not expos
 - [x] `npm run db:migrate --workspace @f-commerce/backend` → the migration applies cleanly to a scratch database with an existing business and to the live database → AC-1, AC-4
 - [x] `npm run test --workspace @f-commerce/contracts` → the timezone schema cases and the updated business fixtures pass → AC-2
 - [x] `npm run test --workspace @f-commerce/backend` → the profile, onboarding, draft, repository, controller, and timezone helper suites pass → AC-1, AC-2, AC-3, AC-10, AC-11
+      Re-ran 2026-10-31 after the logo fix: 390 passed. Contracts 113 and frontend 300 passed in the same session (the frontend suite stands at 300 now that the duplicated browser zone test is gone); the browser specs run separately.
 - [x] `npm run test --workspace @f-commerce/frontend` → the provider, cache, select, settings dialog, formatter, deadline, and shell suites pass → AC-5, AC-6, AC-7, AC-8, AC-9, AC-11, AC-12
 - [x] `npm run lint`, `npm run typecheck`, and `npm run format:check` → all clean → AC-1 to AC-12 (quality gate)
+      Re-ran 2026-10-31 after the logo fix: all clean.
 - [x] `npm run build` → the backend and frontend builds pass with the generated contracts → AC-12 (build gate)
+      Re-ran 2026-10-31 after the logo fix with `API_ORIGIN=http://localhost:4000 npm run build`: both builds pass and every route compiles.
 
 ## Acceptance-criteria coverage
 
